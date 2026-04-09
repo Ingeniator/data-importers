@@ -1,0 +1,32 @@
+datasources:
+  - name: "S3 / MinIO"
+    type: s3
+    bucket: "llogr-raw-events"
+    region: "us-east-1"
+    endpoint: "http://minio:9000"
+    public_endpoint: "http://localhost:8888/s3"
+    access_key_id: "minioadmin"
+    secret_access_key: "minioadmin"
+    addressing_style: "path"
+
+  - name: "ClickHouse"
+    type: clickhouse
+    url: "http://clickhouse:8123"
+    database: "default"
+    table: "llogr_events"
+    user: "default"
+    password: "clickhouse"
+
+  - name: "Trino"
+    type: trino
+    url: "http://trino:8080"
+    catalog: "hive"
+    schema_name: "llm_logs"
+    table: "llogr_events"
+    user: "dataimporter"
+
+server:
+  root_path: "/dataimporter"
+  hide_auth_inputs: true
+  port: 5001
+  workers: 2

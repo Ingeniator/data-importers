@@ -1,0 +1,8 @@
+datasources:
+  - name: "Local MinIO"
+    type: s3
+    bucket: "llogr-raw-events"
+    region: "us-east-1"
+    endpoint: "http://localhost:9000"
+    access_key_id: "minioadmin"
+    secret_access_key: "minioadmin"

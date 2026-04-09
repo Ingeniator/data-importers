@@ -1,0 +1,37 @@
+[project]
+name = "dataimporter"
+version = "0.1.0"
+description = "Browse and search LLM logs in external S3/ClickHouse/other adapters"
+readme = "README.md"
+authors = [
+    { name = "MironovSergei", email = "waityourletters@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.135.1",
+    "uvicorn[standard]>=0.41.0",
+    "aioboto3>=13.0.0",
+    "httpx>=0.28.1",
+    "prometheus-fastapi-instrumentator>=7.0.0",
+    "structlog>=25.5.0",
+    "duckdb>=1.5.1",
+    "duckdb-extensions",
+    "duckdb-extension-httpfs",
+    "jinja2>=3.1.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "pytest>=9.0.2",
+    "moto[s3]>=5.0.0",
+    "pytest-asyncio>=0.25.0",
+    "respx>=0.22.0",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "strict"
