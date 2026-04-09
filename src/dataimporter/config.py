@@ -66,7 +66,7 @@ def _resolve_vault_refs(text: str, secrets: dict[str, str]) -> str:
 class Datasource:
     """A named datasource — analogous to a Grafana datasource."""
     name: str
-    type: str  # "s3", "clickhouse", "trino"
+    type: str  # "s3", "clickhouse", "trino", "langfuse"
     # S3 fields (used when type == "s3")
     bucket: str = ""
     region: str = "us-east-1"

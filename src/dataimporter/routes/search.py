@@ -94,4 +94,17 @@ async def search(
 
         return {"results": results, "files_scanned": len(keys), "keys": keys, "backend": "duckdb"}
 
+    if ds.type == "langfuse":
+        from dataimporter.langfuse import search_logs_langfuse
+
+        results = await search_logs_langfuse(
+            query=q,
+            ds=ds,
+            start=start, end=end,
+            session_id=session_id, trace_id=trace_id,
+            trace_type=trace_type, input_hash=input_hash,
+            limit=limit,
+        )
+        return {"results": results, "backend": "langfuse"}
+
     raise HTTPException(status_code=400, detail=f"Search not supported for datasource type '{ds.type}'")

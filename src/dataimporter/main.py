@@ -95,6 +95,9 @@ async def ready(settings: Settings = Depends(get_settings)):
                 async with _httpx.AsyncClient(timeout=3) as client:
                     resp = await client.get(f"{ds.url.rstrip('/')}/v1/info")
                     resp.raise_for_status()
+            elif ds.type == "langfuse" and ds.url:
+                from dataimporter.langfuse import ping_langfuse
+                await ping_langfuse(ds)
         except Exception:
             return StarletteResponse(status_code=503)
 
@@ -127,6 +130,10 @@ async def health(settings: Settings = Depends(get_settings)) -> dict:
                 async with _httpx.AsyncClient(timeout=3) as client:
                     resp = await client.get(f"{ds.url.rstrip('/')}/v1/info")
                     resp.raise_for_status()
+                components[ds.name] = "ok"
+            elif ds.type == "langfuse" and ds.url:
+                from dataimporter.langfuse import ping_langfuse
+                await ping_langfuse(ds)
                 components[ds.name] = "ok"
         except Exception as exc:
             components[ds.name] = "degraded"
