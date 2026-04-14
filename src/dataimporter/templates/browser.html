@@ -37,6 +37,21 @@
   .ds-type-badge { font-size: .7rem; padding: 2px 6px; border-radius: 3px; font-weight: 500; text-transform: uppercase; }
   .ds-type-s3 { background: #dcfce7; color: #166534; }
   .ds-type-clickhouse { background: #fef3c7; color: #92400e; }
+  .ds-type-langfuse { background: #ede9fe; color: #5b21b6; }
+  .ds-type-trino { background: #dbeafe; color: #1e40af; }
+
+  /* Connection modal */
+  .conn-form label { margin-top: 10px; }
+  .conn-form input, .conn-form select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: .9rem; margin-top: 4px; }
+  .conn-form .actions { margin-top: 16px; display: flex; gap: 8px; justify-content: flex-end; }
+  .ds-tab-add { font-weight: 400; color: #999; border: 1px dashed #ccc; }
+  .ds-tab-add:hover { color: #333; border-color: #999; background: #f9fafb; }
+  .ds-tab .ds-remove { display: none; margin-left: 4px; font-size: .75rem; color: #999; cursor: pointer; padding: 0 3px; }
+  .ds-tab:hover .ds-remove { display: inline; }
+  .ds-remove:hover { color: #dc2626; }
+  .conn-status { margin-top: 8px; font-size: .85rem; padding: 6px 10px; border-radius: 4px; }
+  .conn-status.ok { background: #dcfce7; color: #166534; }
+  .conn-status.err { background: #fee2e2; color: #991b1b; }
 
   /* Time picker */
   .time-picker { position: relative; }
@@ -138,8 +153,10 @@
 
 <script>
 const BASE = '{{ base_path }}';
-let datasources = [];
-let activeDs = null; // current Datasource object {name, type}
+let datasources = [];      // server-configured datasources
+let connections = [];       // allowlisted connection templates from server
+let userConnections = [];   // user-created connections (localStorage)
+let activeDs = null;        // current tab: {name, type, _user?: true, _connUrl?, _pk?, _sk?}
 let currentEvents = [];
 let currentSearchKeys = [];
 let timePreset = '24h';
@@ -150,6 +167,15 @@ const PRESETS = {
   '24h': 24*60*60*1000, '7d': 7*24*60*60*1000, '30d': 30*24*60*60*1000,
   'all': null,
 };
+
+const LS_KEY = 'dataimporter_user_connections';
+
+function loadUserConnections() {
+  try { userConnections = JSON.parse(localStorage.getItem(LS_KEY) || '[]'); } catch { userConnections = []; }
+}
+function saveUserConnections() {
+  localStorage.setItem(LS_KEY, JSON.stringify(userConnections));
+}
 
 // ── Time picker ──
 function toggleTimeDropdown() { document.getElementById('timeDropdown').classList.toggle('open'); }
@@ -195,22 +221,37 @@ function esc(s) { const d = document.createElement('div'); d.textContent = s; re
 // ══════════════════════════════════════════
 
 async function init() {
+  loadUserConnections();
   try {
     const resp = await fetch(BASE + '/api/public/ui-config');
     if (resp.ok) {
       const cfg = await resp.json();
       if (cfg.hide_auth_inputs) document.getElementById('authCard').style.display = 'none';
       datasources = cfg.datasources || [];
+      connections = cfg.connections || [];
     }
   } catch {}
 
   renderTabs();
-  if (datasources.length) selectDatasource(datasources[0]);
+  const allTabs = getAllTabs();
+  if (allTabs.length) selectDatasource(allTabs[0]);
+}
+
+function getAllTabs() {
+  // Server datasources + user connections
+  const tabs = datasources.map(ds => ({...ds}));
+  for (const uc of userConnections) {
+    tabs.push({ name: uc.name, type: uc.type, _user: true, _connUrl: uc.url, _pk: uc.pk, _sk: uc.sk });
+  }
+  return tabs;
 }
 
 function renderTabs() {
   const container = document.getElementById('dsTabs');
-  if (!datasources.length) {
+  const allTabs = getAllTabs();
+  const hasConnections = connections.length > 0;
+
+  if (!allTabs.length && !hasConnections) {
     container.innerHTML = '';
     document.getElementById('filtersCard').style.display = 'none';
     document.getElementById('results').style.display = 'none';
@@ -218,17 +259,124 @@ function renderTabs() {
       '<div class="empty-state"><p>No datasources configured</p><small>Add datasources to config.yaml</small></div>';
     return;
   }
-  container.innerHTML = datasources.map(ds =>
-    '<div class="ds-tab" data-name="' + esc(ds.name) + '" onclick="selectDatasource(findDs(\'' + esc(ds.name) + '\'))">' +
-      esc(ds.name) +
+
+  let html = allTabs.map(ds => {
+    const removeBtn = ds._user
+      ? '<span class="ds-remove" onclick="event.stopPropagation();removeUserConnection(\'' + esc(ds.name) + '\')">&times;</span>'
+      : '';
+    return '<div class="ds-tab" data-name="' + esc(ds.name) + '" onclick="selectDatasource(findTab(\'' + esc(ds.name) + '\'))">' +
+      esc(ds.name) + removeBtn +
       '<span class="ds-type-badge ds-type-' + esc(ds.type) + '">' + esc(ds.type) + '</span>' +
-    '</div>'
-  ).join('');
+    '</div>';
+  }).join('');
+
+  if (hasConnections) {
+    html += '<div class="ds-tab ds-tab-add" onclick="showAddConnectionModal()">+ Add connection</div>';
+  }
+
+  container.innerHTML = html;
 }
 
-function findDs(name) { return datasources.find(d => d.name === name); }
+function findTab(name) { return getAllTabs().find(d => d.name === name); }
+
+function removeUserConnection(name) {
+  userConnections = userConnections.filter(c => c.name !== name);
+  saveUserConnections();
+  renderTabs();
+  if (activeDs && activeDs.name === name) {
+    const allTabs = getAllTabs();
+    if (allTabs.length) selectDatasource(allTabs[0]);
+    else {
+      activeDs = null;
+      document.getElementById('filtersCard').style.display = 'none';
+      document.getElementById('results').style.display = 'none';
+    }
+  }
+}
+
+// ── Add connection modal ──
+function showAddConnectionModal() {
+  const options = connections.map(c =>
+    '<option value="' + esc(c.url) + '" data-has-creds="' + (c.has_credentials ? '1' : '') + '">' + esc(c.label) + '</option>'
+  ).join('');
+
+  showModal('Add connection', '');
+  document.querySelector('.modal-body').innerHTML =
+    '<div class="conn-form">' +
+      '<label>Host</label>' +
+      '<select id="conn_url" onchange="onConnHostChange()">' + options + '</select>' +
+      '<label>Name</label>' +
+      '<input type="text" id="conn_name" placeholder="My Langfuse">' +
+      '<div id="conn_creds_fields">' +
+        '<label>Public Key</label>' +
+        '<input type="text" id="conn_pk" placeholder="pk-lf-...">' +
+        '<label>Secret Key</label>' +
+        '<input type="text" id="conn_sk" placeholder="sk-lf-...">' +
+      '</div>' +
+      '<div id="conn_status"></div>' +
+      '<div class="actions">' +
+        '<button class="btn-secondary" onclick="testConnection()">Test</button>' +
+        '<button class="btn-primary" onclick="saveConnection()">Save</button>' +
+      '</div>' +
+    '</div>';
+  onConnHostChange();
+}
+
+function onConnHostChange() {
+  const sel = document.getElementById('conn_url');
+  const opt = sel.options[sel.selectedIndex];
+  const hasCreds = opt && opt.dataset.hasCreds === '1';
+  document.getElementById('conn_creds_fields').style.display = hasCreds ? 'none' : '';
+}
+
+async function testConnection() {
+  const statusDiv = document.getElementById('conn_status');
+  statusDiv.innerHTML = '<div class="conn-status">Testing...</div>';
+  const url = document.getElementById('conn_url').value;
+  const pk = document.getElementById('conn_pk').value;
+  const sk = document.getElementById('conn_sk').value;
+  try {
+    const resp = await fetch(BASE + '/api/public/proxy/ping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ credentials: { connection_url: url, access_key_id: pk, secret_access_key: sk } }),
+    });
+    if (resp.ok) {
+      statusDiv.innerHTML = '<div class="conn-status ok">Connected successfully</div>';
+    } else {
+      const data = await resp.json().catch(() => ({}));
+      statusDiv.innerHTML = '<div class="conn-status err">Failed: ' + esc(data.detail || resp.statusText) + '</div>';
+    }
+  } catch (e) {
+    statusDiv.innerHTML = '<div class="conn-status err">Error: ' + esc(e.message) + '</div>';
+  }
+}
+
+function saveConnection() {
+  const url = document.getElementById('conn_url').value;
+  const name = document.getElementById('conn_name').value.trim();
+  const pk = document.getElementById('conn_pk').value;
+  const sk = document.getElementById('conn_sk').value;
+  if (!name) { alert('Name is required'); return; }
+
+  // Find connection type from allowlist
+  const conn = connections.find(c => c.url === url);
+  if (!conn) return;
+
+  if (!conn.has_credentials && !pk) { alert('Public Key is required'); return; }
+
+  // Remove existing with same name
+  userConnections = userConnections.filter(c => c.name !== name);
+  userConnections.push({ name, type: conn.type, url, pk, sk });
+  saveUserConnections();
+  closeModal();
+  renderTabs();
+  // Select the new connection
+  selectDatasource(findTab(name));
+}
 
 function selectDatasource(ds) {
+  if (!ds) return;
   activeDs = ds;
   // Update tab highlights
   document.querySelectorAll('.ds-tab').forEach(tab => {
@@ -251,14 +399,14 @@ function renderFilters() {
   document.getElementById('filterInputHash').style.display = isS3 ? '' : 'none';
 
   const actions = document.getElementById('actionButtons');
-  if (activeDs.type === 'clickhouse') {
+  if (activeDs.type === 'clickhouse' || activeDs.type === 'trino' || activeDs.type === 'langfuse') {
     actions.innerHTML =
       '<button class="btn-primary" onclick="searchEvents()">Search</button>' +
       '<button class="btn-secondary" onclick="listEvents()">List recent</button>';
   } else {
     actions.innerHTML =
-      '<button class="btn-primary" onclick="loadLogs()">List files</button>' +
-      '<button class="btn-primary" onclick="fullTextSearch()">Full-text search</button>';
+      '<button class="btn-primary" onclick="fullTextSearch()">Search</button>' +
+      '<button class="btn-secondary" onclick="loadLogs()">List recent</button>';
   }
 }
 
@@ -276,8 +424,44 @@ function searchParams() {
   return params;
 }
 
+function commonFilters() {
+  const range = getTimeRange();
+  const obj = {};
+  if (range.start) obj.start = range.start;
+  if (range.end) obj.end = range.end;
+  const s = document.getElementById('f_session').value.trim();
+  const t = document.getElementById('f_trace').value.trim();
+  const tt = document.getElementById('f_tracetype').value.trim();
+  const h = document.getElementById('f_hash').value.trim();
+  if (s) obj.session_id = s;
+  if (t) obj.trace_id = t;
+  if (tt) obj.trace_type = tt;
+  if (h) obj.input_hash = h;
+  return obj;
+}
+
+// Proxy search for user connections
+async function proxySearch(q, limit) {
+  const body = {
+    credentials: { connection_url: activeDs._connUrl, access_key_id: activeDs._pk, secret_access_key: activeDs._sk },
+    q: q,
+    limit: limit,
+    ...commonFilters(),
+  };
+  const resp = await fetch(BASE + '/api/public/proxy/search', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!resp.ok) {
+    const data = await resp.json().catch(() => ({}));
+    throw new Error(data.detail || 'HTTP ' + resp.status);
+  }
+  return resp.json();
+}
+
 // ══════════════════════════════════════════
-//  CLICKHOUSE MODE
+//  SEARCH MODE (ClickHouse, Trino, Langfuse)
 // ══════════════════════════════════════════
 
 async function searchEvents() {
@@ -285,15 +469,20 @@ async function searchEvents() {
   if (!q) return;
   const status = document.getElementById('status');
   status.textContent = 'Searching...';
-  const params = searchParams();
-  params.set('q', q);
-  params.set('limit', '100');
   try {
-    const resp = await fetch(BASE + '/api/public/logs/search?' + params, {
-      headers: { 'Authorization': authHeader() }
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
+    let data;
+    if (activeDs._user) {
+      data = await proxySearch(q, 100);
+    } else {
+      const params = searchParams();
+      params.set('q', q);
+      params.set('limit', '100');
+      const resp = await fetch(BASE + '/api/public/logs/search?' + params, {
+        headers: { 'Authorization': authHeader() }
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      data = await resp.json();
+    }
     currentEvents = data.results;
     currentSearchKeys = [];
     renderEventsTable(currentEvents);
@@ -304,15 +493,20 @@ async function searchEvents() {
 async function listEvents() {
   const status = document.getElementById('status');
   status.textContent = 'Loading...';
-  const params = searchParams();
-  params.set('q', '*');
-  params.set('limit', '100');
   try {
-    const resp = await fetch(BASE + '/api/public/logs/search?' + params, {
-      headers: { 'Authorization': authHeader() }
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
+    let data;
+    if (activeDs._user) {
+      data = await proxySearch('*', 100);
+    } else {
+      const params = searchParams();
+      params.set('q', '*');
+      params.set('limit', '100');
+      const resp = await fetch(BASE + '/api/public/logs/search?' + params, {
+        headers: { 'Authorization': authHeader() }
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      data = await resp.json();
+    }
     currentEvents = data.results;
     renderEventsTable(currentEvents);
     status.textContent = currentEvents.length + ' event(s) [' + activeDs.name + ' / ' + (data.backend || activeDs.type) + ']';

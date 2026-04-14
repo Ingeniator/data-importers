@@ -13,6 +13,7 @@ from starlette.responses import Response as StarletteResponse
 from dataimporter.config import Settings, get_settings
 from dataimporter.routes.logs import router as logs_router
 from dataimporter.routes.media import router as media_router
+from dataimporter.routes.proxy import router as proxy_router
 from dataimporter.routes.search import router as search_router
 from dataimporter.routes.ui import router as ui_router
 
@@ -39,6 +40,7 @@ app.add_middleware(RequestIDMiddleware)
 
 app.include_router(logs_router)
 app.include_router(media_router)
+app.include_router(proxy_router)
 app.include_router(search_router)
 app.include_router(ui_router)
 
@@ -166,5 +168,13 @@ def ui_config(settings: Settings = Depends(get_settings)) -> dict:
         "datasources": [
             {"name": ds.name, "type": ds.type}
             for ds in settings.datasources
+        ],
+        "connections": [
+            {
+                "type": c.type, "url": c.url,
+                "label": c.label or f"{c.type} ({c.url})",
+                "has_credentials": bool(c.public_key and c.secret_key),
+            }
+            for c in settings.connections
         ],
     }

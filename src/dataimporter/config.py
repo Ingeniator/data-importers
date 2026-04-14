@@ -91,6 +91,16 @@ class Datasource:
 
 
 @dataclass(frozen=True)
+class Connection:
+    """An allowlisted connection template — users provide only credentials."""
+    type: str  # "langfuse", "clickhouse", "trino"
+    url: str
+    label: str = ""
+    public_key: str = ""
+    secret_key: str = ""
+
+
+@dataclass(frozen=True)
 class ServerConfig:
     root_path: str = ""
     host: str = "0.0.0.0"
@@ -105,6 +115,7 @@ class ServerConfig:
 @dataclass(frozen=True)
 class Settings:
     datasources: tuple[Datasource, ...] = ()
+    connections: tuple[Connection, ...] = ()
     server: ServerConfig = ServerConfig()
 
     def get_datasource(self, name: str) -> Datasource | None:
@@ -133,8 +144,12 @@ def load_config(path: str | Path) -> Settings:
     datasources_raw = raw.get("datasources", [])
     datasources = tuple(_parse_datasource(ds) for ds in datasources_raw)
 
+    connections_raw = raw.get("connections", [])
+    connections = tuple(Connection(**c) for c in connections_raw)
+
     return Settings(
         datasources=datasources,
+        connections=connections,
         server=ServerConfig(**raw.get("server", {})),
     )
 

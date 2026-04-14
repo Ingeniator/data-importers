@@ -25,6 +25,16 @@ datasources:
     table: "llogr_events"
     user: "dataimporter"
 
+connections:
+  - type: langfuse
+    url: "http://langfuse-web:3000"
+    label: "Langfuse (local)"
+    public_key: "lf-pk-ai-suite"
+    secret_key: "lf-sk-ai-suite"
+  - type: langfuse
+    url: "http://langfuse-web:3000"
+    label: "Langfuse (own keys)"
+
 server:
   root_path: "/dataimporter"
   hide_auth_inputs: true
