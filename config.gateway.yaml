@@ -25,12 +25,13 @@ datasources:
     table: "llogr_events"
     user: "dataimporter"
 
-connections:
-  - type: langfuse
+  - name: "Langfuse"
+    type: langfuse
     url: "http://langfuse-web:3000"
-    label: "Langfuse (local)"
-    public_key: "lf-pk-ai-suite"
-    secret_key: "lf-sk-ai-suite"
+    access_key_id: "lf-pk-ai-suite"
+    secret_access_key: "lf-sk-ai-suite"
+
+connections:
   - type: langfuse
     url: "http://langfuse-web:3000"
     label: "Langfuse (own keys)"
