@@ -107,4 +107,19 @@ async def search(
         )
         return {"results": results, "backend": "langfuse"}
 
+    if ds.type == "chyt":
+        from dataimporter.chyt import search_logs_chyt
+
+        results = await search_logs_chyt(
+            query=q,
+            project_id=auth.public_key,
+            is_org_admin=auth.is_org_admin,
+            ds=ds,
+            start=start, end=end,
+            session_id=session_id, trace_id=trace_id,
+            trace_type=trace_type, input_hash=input_hash,
+            limit=limit,
+        )
+        return {"results": results, "backend": "chyt"}
+
     raise HTTPException(status_code=400, detail=f"Search not supported for datasource type '{ds.type}'")

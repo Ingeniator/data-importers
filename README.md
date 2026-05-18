@@ -12,6 +12,7 @@ Read-only companion to [llogr](../llogr) (which handles data ingestion).
 | **ClickHouse** | server-configured | Full-text search over the `llogr_events` table |
 | **Trino** | server-configured | SQL search with polling-based query execution |
 | **Langfuse** | server-configured or user-connected | Fetch traces via the Langfuse REST API |
+| **CHYT** | server-configured | Full-text search over a YTsaurus table via ClickHouse over YT |
 
 ## Configuration
 
@@ -44,7 +45,17 @@ datasources:
     url: "https://cloud.langfuse.com"
     access_key_id: "pk-lf-..."
     secret_access_key: "sk-lf-..."
+
+  - name: "CHYT"
+    type: chyt
+    url: "http://chyt-proxy:8123"
+    database: "*ch_public"              # CHYT clique alias
+    table: "//home/user/llogr_events"  # full YT table path
+    user: "yt"
+    password: "vault:YT_TOKEN"         # YT OAuth token
 ```
+
+CHYT uses the ClickHouse HTTP protocol. `database` is the clique alias (e.g. `*ch_public`), `table` is the full YTsaurus path. The `password` field holds the YT OAuth token.
 
 ### Connections (user-connected)
 

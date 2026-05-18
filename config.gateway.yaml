@@ -25,6 +25,14 @@ datasources:
     table: "llogr_events"
     user: "dataimporter"
 
+  - name: "CHYT"
+    type: chyt
+    url: "http://chyt-proxy:8123"
+    database: "*ch_public"        # CHYT clique alias
+    table: "//home/user/llogr_events"  # full YT table path
+    user: "yt"
+    password: ""                  # YT OAuth token
+
   - name: "Langfuse"
     type: langfuse
     url: "http://langfuse-web:3000"
