@@ -93,11 +93,16 @@ class Datasource:
 @dataclass(frozen=True)
 class Connection:
     """An allowlisted connection template — users provide only credentials."""
-    type: str  # "langfuse", "clickhouse", "trino"
-    url: str
+    type: str  # "langfuse", "s3", "clickhouse", "trino"  
+    url: str   # langfuse base URL or S3 endpoint URL
     label: str = ""
-    public_key: str = ""
-    secret_key: str = ""
+    public_key: str = ""   # langfuse public key or S3 access key id
+    secret_key: str = ""   # langfuse secret key or S3 secret access key
+    # S3-specific defaults (users may override bucket and key_prefix)
+    bucket: str = ""
+    region: str = "us-east-1"
+    addressing_style: str = "path"
+    key_prefix: str = ""
 
 
 @dataclass(frozen=True)
@@ -135,6 +140,12 @@ def _parse_datasource(raw: dict) -> Datasource:
     return Datasource(**filtered)
 
 
+def _parse_connection(raw: dict) -> Connection:
+    known_fields = {f.name for f in Connection.__dataclass_fields__.values()}
+    filtered = {k: v for k, v in raw.items() if k in known_fields}
+    return Connection(**filtered)
+
+
 def load_config(path: str | Path) -> Settings:
     text = Path(path).read_text()
     text = _resolve_vault_refs(text, _load_vault_secrets(VAULT_SECRETS_PATH))
@@ -145,7 +156,7 @@ def load_config(path: str | Path) -> Settings:
     datasources = tuple(_parse_datasource(ds) for ds in datasources_raw)
 
     connections_raw = raw.get("connections", [])
-    connections = tuple(Connection(**c) for c in connections_raw)
+    connections = tuple(_parse_connection(c) for c in connections_raw)
 
     return Settings(
         datasources=datasources,

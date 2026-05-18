@@ -149,6 +149,60 @@ async def generate_presigned_urls(
     return results
 
 
+async def ping_s3(ds: Datasource) -> None:
+    """Health check — verify S3 bucket is accessible with the given credentials."""
+    session = _s3_session(ds)
+    async with session.client("s3", endpoint_url=ds.endpoint, config=_s3_client_config(ds)) as client:
+        await client.head_bucket(Bucket=ds.bucket)
+
+
+async def list_objects_proxy(
+    ds: Datasource,
+    start: datetime | None = None,
+    end: datetime | None = None,
+    session_id: str | None = None,
+    trace_id: str | None = None,
+    input_hash: str | None = None,
+    trace_type: str | None = None,
+    limit: int = 50,
+) -> list[dict]:
+    """List objects under ds.key_prefix using caller-supplied credentials (no auth-based prefix)."""
+    prefix = ds.key_prefix.strip("/") + "/" if ds.key_prefix else ""
+    session = _s3_session(ds)
+    results: list[dict] = []
+    async with session.client("s3", endpoint_url=ds.endpoint, config=_s3_client_config(ds)) as client:
+        paginator = client.get_paginator("list_objects_v2")
+        async for page in paginator.paginate(Bucket=ds.bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                if len(results) >= limit:
+                    return results
+                key = obj["Key"]
+                meta = parse_key_meta(key)
+                if meta is None:
+                    continue
+                if start and meta.timestamp < start:
+                    continue
+                if end and meta.timestamp > end:
+                    continue
+                if session_id and meta.session_id != session_id:
+                    continue
+                if trace_id and meta.trace_id != trace_id:
+                    continue
+                if input_hash and meta.input_hash != input_hash:
+                    continue
+                if trace_type and meta.trace_type != trace_type:
+                    continue
+                results.append({
+                    "key": key,
+                    "session_id": meta.session_id,
+                    "trace_id": meta.trace_id,
+                    "trace_type": meta.trace_type,
+                    "input_hash": meta.input_hash,
+                    "timestamp": meta.timestamp.isoformat(),
+                })
+    return results
+
+
 async def list_batch_urls(
     auth: AuthContext,
     ds: Datasource,

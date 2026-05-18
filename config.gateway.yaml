@@ -44,6 +44,20 @@ connections:
     url: "http://langfuse-web:3000"
     label: "Langfuse (own keys)"
 
+  # Lock to a specific S3 endpoint — users supply only credentials + bucket/path
+  - type: s3
+    url: "http://minio:9000"
+    label: "MinIO (own keys)"
+    region: "us-east-1"
+    addressing_style: "path"
+
+  # Allow any S3-compatible endpoint — users supply endpoint + credentials + bucket/path
+  - type: s3
+    url: "*"
+    label: "Custom S3"
+    region: "us-east-1"
+    addressing_style: "path"
+
 server:
   root_path: "/dataimporter"
   hide_auth_inputs: true
