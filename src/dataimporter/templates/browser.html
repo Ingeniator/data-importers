@@ -238,10 +238,13 @@ async function init() {
 }
 
 function getAllTabs() {
-  // Server datasources + user connections
   const tabs = datasources.map(ds => ({...ds}));
   for (const uc of userConnections) {
-    tabs.push({ name: uc.name, type: uc.type, _user: true, _connUrl: uc.url, _pk: uc.pk, _sk: uc.sk });
+    tabs.push({
+      name: uc.name, type: uc.type, _user: true,
+      _connUrl: uc.url, _pk: uc.pk, _sk: uc.sk,
+      _bucket: uc.bucket, _key_prefix: uc.key_prefix, _region: uc.region,
+    });
   }
   return tabs;
 }
@@ -297,7 +300,7 @@ function removeUserConnection(name) {
 // ── Add connection modal ──
 function showAddConnectionModal() {
   const options = connections.map(c =>
-    '<option value="' + esc(c.url) + '" data-has-creds="' + (c.has_credentials ? '1' : '') + '">' + esc(c.label) + '</option>'
+    '<option value="' + esc(c.url) + '" data-type="' + esc(c.type) + '" data-has-creds="' + (c.has_credentials ? '1' : '') + '">' + esc(c.label) + '</option>'
   ).join('');
 
   showModal('Add connection', '');
@@ -306,12 +309,24 @@ function showAddConnectionModal() {
       '<label>Host</label>' +
       '<select id="conn_url" onchange="onConnHostChange()">' + options + '</select>' +
       '<label>Name</label>' +
-      '<input type="text" id="conn_name" placeholder="My Langfuse">' +
+      '<input type="text" id="conn_name" placeholder="My connection">' +
+      '<div id="conn_endpoint_field" style="display:none">' +
+        '<label>Endpoint URL</label>' +
+        '<input type="text" id="conn_endpoint" placeholder="https://s3.amazonaws.com or http://minio:9000">' +
+      '</div>' +
       '<div id="conn_creds_fields">' +
-        '<label>Public Key</label>' +
-        '<input type="text" id="conn_pk" placeholder="pk-lf-...">' +
-        '<label>Secret Key</label>' +
-        '<input type="text" id="conn_sk" placeholder="sk-lf-...">' +
+        '<label id="conn_pk_label">Public Key</label>' +
+        '<input type="text" id="conn_pk" placeholder="...">' +
+        '<label id="conn_sk_label">Secret Key</label>' +
+        '<input type="text" id="conn_sk" placeholder="...">' +
+      '</div>' +
+      '<div id="conn_s3_fields" style="display:none">' +
+        '<label>Bucket</label>' +
+        '<input type="text" id="conn_bucket" placeholder="my-bucket">' +
+        '<label>Path prefix <small style="font-weight:400;color:#999">(optional)</small></label>' +
+        '<input type="text" id="conn_key_prefix" placeholder="logs/prod">' +
+        '<label>Region <small style="font-weight:400;color:#999">(optional)</small></label>' +
+        '<input type="text" id="conn_region" placeholder="us-east-1">' +
       '</div>' +
       '<div id="conn_status"></div>' +
       '<div class="actions">' +
@@ -326,20 +341,62 @@ function onConnHostChange() {
   const sel = document.getElementById('conn_url');
   const opt = sel.options[sel.selectedIndex];
   const hasCreds = opt && opt.dataset.hasCreds === '1';
-  document.getElementById('conn_creds_fields').style.display = hasCreds ? 'none' : '';
+  const type = opt && opt.dataset.type;
+  const isS3 = type === 's3';
+  const isWildcard = isS3 && sel.value === '*';
+
+  document.getElementById('conn_endpoint_field').style.display = isWildcard ? '' : 'none';
+  document.getElementById('conn_s3_fields').style.display = isS3 ? '' : 'none';
+  document.getElementById('conn_creds_fields').style.display = (!isS3 && hasCreds) ? 'none' : '';
+
+  if (isS3) {
+    document.getElementById('conn_pk_label').textContent = 'Access Key ID';
+    document.getElementById('conn_sk_label').textContent = 'Secret Access Key';
+    document.getElementById('conn_pk').placeholder = 'AKIA...';
+    document.getElementById('conn_sk').placeholder = 'wJalrXUtnFEMI...';
+  } else {
+    document.getElementById('conn_pk_label').textContent = 'Public Key';
+    document.getElementById('conn_sk_label').textContent = 'Secret Key';
+    document.getElementById('conn_pk').placeholder = 'pk-lf-...';
+    document.getElementById('conn_sk').placeholder = 'sk-lf-...';
+  }
 }
 
 async function testConnection() {
   const statusDiv = document.getElementById('conn_status');
   statusDiv.innerHTML = '<div class="conn-status">Testing...</div>';
-  const url = document.getElementById('conn_url').value;
+
+  const sel = document.getElementById('conn_url');
+  const opt = sel.options[sel.selectedIndex];
+  const type = opt && opt.dataset.type;
+  const isS3 = type === 's3';
+  const isWildcard = isS3 && sel.value === '*';
+
+  let connUrl = sel.value;
+  if (isWildcard) {
+    connUrl = document.getElementById('conn_endpoint').value.trim();
+    if (!connUrl) { statusDiv.innerHTML = '<div class="conn-status err">Endpoint URL is required</div>'; return; }
+  }
+
   const pk = document.getElementById('conn_pk').value;
   const sk = document.getElementById('conn_sk').value;
+  const credentials = { connection_url: connUrl, access_key_id: pk, secret_access_key: sk };
+
+  if (isS3) {
+    const bucket = document.getElementById('conn_bucket').value.trim();
+    if (!bucket) { statusDiv.innerHTML = '<div class="conn-status err">Bucket is required</div>'; return; }
+    credentials.bucket = bucket;
+    const keyPrefix = document.getElementById('conn_key_prefix').value.trim();
+    const region = document.getElementById('conn_region').value.trim();
+    if (keyPrefix) credentials.key_prefix = keyPrefix;
+    if (region) credentials.region = region;
+  }
+
   try {
     const resp = await fetch(BASE + '/api/public/proxy/ping', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credentials: { connection_url: url, access_key_id: pk, secret_access_key: sk } }),
+      body: JSON.stringify({ credentials }),
     });
     if (resp.ok) {
       statusDiv.innerHTML = '<div class="conn-status ok">Connected successfully</div>';
@@ -353,25 +410,45 @@ async function testConnection() {
 }
 
 function saveConnection() {
-  const url = document.getElementById('conn_url').value;
-  const name = document.getElementById('conn_name').value.trim();
-  const pk = document.getElementById('conn_pk').value;
-  const sk = document.getElementById('conn_sk').value;
-  if (!name) { alert('Name is required'); return; }
+  const sel = document.getElementById('conn_url');
+  const opt = sel.options[sel.selectedIndex];
+  const type = opt && opt.dataset.type;
+  const isS3 = type === 's3';
+  const isWildcard = isS3 && sel.value === '*';
 
-  // Find connection type from allowlist
-  const conn = connections.find(c => c.url === url);
+  const conn = connections.find(c => c.url === sel.value);
   if (!conn) return;
 
-  if (!conn.has_credentials && !pk) { alert('Public Key is required'); return; }
+  let connUrl = sel.value;
+  if (isWildcard) {
+    connUrl = document.getElementById('conn_endpoint').value.trim();
+    if (!connUrl) { alert('Endpoint URL is required'); return; }
+  }
 
-  // Remove existing with same name
+  const name = document.getElementById('conn_name').value.trim();
+  if (!name) { alert('Name is required'); return; }
+
+  const pk = document.getElementById('conn_pk').value;
+  const sk = document.getElementById('conn_sk').value;
+  if (!isS3 && !conn.has_credentials && !pk) { alert('Public Key is required'); return; }
+
+  const entry = { name, type: conn.type, url: connUrl, pk, sk };
+
+  if (isS3) {
+    const bucket = document.getElementById('conn_bucket').value.trim();
+    if (!bucket) { alert('Bucket is required'); return; }
+    entry.bucket = bucket;
+    const keyPrefix = document.getElementById('conn_key_prefix').value.trim();
+    const region = document.getElementById('conn_region').value.trim();
+    if (keyPrefix) entry.key_prefix = keyPrefix;
+    if (region) entry.region = region;
+  }
+
   userConnections = userConnections.filter(c => c.name !== name);
-  userConnections.push({ name, type: conn.type, url, pk, sk });
+  userConnections.push(entry);
   saveUserConnections();
   closeModal();
   renderTabs();
-  // Select the new connection
   selectDatasource(findTab(name));
 }
 
@@ -399,14 +476,16 @@ function renderFilters() {
   document.getElementById('filterInputHash').style.display = isS3 ? '' : 'none';
 
   const actions = document.getElementById('actionButtons');
-  if (activeDs.type === 'clickhouse' || activeDs.type === 'trino' || activeDs.type === 'langfuse') {
-    actions.innerHTML =
-      '<button class="btn-primary" onclick="searchEvents()">Search</button>' +
-      '<button class="btn-secondary" onclick="listEvents()">List recent</button>';
-  } else {
+  if (isS3 && !activeDs._user) {
+    // Server-configured S3: DuckDB full-text search
     actions.innerHTML =
       '<button class="btn-primary" onclick="fullTextSearch()">Search</button>' +
       '<button class="btn-secondary" onclick="loadLogs()">List recent</button>';
+  } else {
+    // Langfuse, ClickHouse, Trino, or user-defined S3 via proxy
+    actions.innerHTML =
+      '<button class="btn-primary" onclick="searchEvents()">Search</button>' +
+      '<button class="btn-secondary" onclick="listEvents()">List recent</button>';
   }
 }
 
@@ -442,8 +521,18 @@ function commonFilters() {
 
 // Proxy search for user connections
 async function proxySearch(q, limit) {
+  const credentials = {
+    connection_url: activeDs._connUrl,
+    access_key_id: activeDs._pk,
+    secret_access_key: activeDs._sk,
+  };
+  if (activeDs.type === 's3') {
+    if (activeDs._bucket) credentials.bucket = activeDs._bucket;
+    if (activeDs._key_prefix) credentials.key_prefix = activeDs._key_prefix;
+    if (activeDs._region) credentials.region = activeDs._region;
+  }
   const body = {
-    credentials: { connection_url: activeDs._connUrl, access_key_id: activeDs._pk, secret_access_key: activeDs._sk },
+    credentials,
     q: q,
     limit: limit,
     ...commonFilters(),
@@ -485,8 +574,13 @@ async function searchEvents() {
     }
     currentEvents = data.results;
     currentSearchKeys = [];
-    renderEventsTable(currentEvents);
-    status.textContent = currentEvents.length + ' event(s) found [' + activeDs.name + ' / ' + (data.backend || activeDs.type) + ']';
+    if (data.backend === 's3') {
+      renderFilesTable(currentEvents);
+      status.textContent = currentEvents.length + ' batch(es) found [' + activeDs.name + ' / s3]';
+    } else {
+      renderEventsTable(currentEvents);
+      status.textContent = currentEvents.length + ' event(s) found [' + activeDs.name + ' / ' + (data.backend || activeDs.type) + ']';
+    }
   } catch (e) { status.textContent = 'Error: ' + e.message; }
 }
 
@@ -508,8 +602,13 @@ async function listEvents() {
       data = await resp.json();
     }
     currentEvents = data.results;
-    renderEventsTable(currentEvents);
-    status.textContent = currentEvents.length + ' event(s) [' + activeDs.name + ' / ' + (data.backend || activeDs.type) + ']';
+    if (data.backend === 's3') {
+      renderFilesTable(currentEvents);
+      status.textContent = currentEvents.length + ' batch(es) [' + activeDs.name + ' / s3]';
+    } else {
+      renderEventsTable(currentEvents);
+      status.textContent = currentEvents.length + ' event(s) [' + activeDs.name + ' / ' + (data.backend || activeDs.type) + ']';
+    }
   } catch (e) { status.textContent = 'Error: ' + e.message; }
 }
 
