@@ -1,2 +1,3 @@
 src/dataimporter/**/__pycache__/*
 *.pyc
+docs/tasks-feature-questions.md
