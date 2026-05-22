@@ -137,6 +137,16 @@ async def list_datasets():
     return {"datasets": list(_datasets.values()), "count": len(_datasets)}
 
 
+@app.delete("/_mock/datasets", status_code=200)
+async def clean_datasets():
+    count = len(_datasets)
+    _datasets.clear()
+    _files.clear()
+    for f in _UPLOAD_DIR.glob("*"):
+        f.unlink(missing_ok=True)
+    return {"deleted": count}
+
+
 @app.get("/_mock/datasets/{dataset_id}")
 async def inspect_dataset(dataset_id: str):
     if dataset_id not in _datasets:
