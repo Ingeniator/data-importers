@@ -58,8 +58,18 @@ connections:
     region: "us-east-1"
     addressing_style: "path"
 
+targets:
+  - name: "Mock Dataset Service"
+    base_url: "http://dataset-mock:9100"
+    token_url: "http://dataset-mock:9100/realms/test/protocol/openid-connect/token"
+    client_id: "dataimporter"
+    client_secret: "any"
+    default_access: "organization"
+    default_dataset_type: "DATASET"
+
 server:
   root_path: "/dataimporter"
   hide_auth_inputs: true
   port: 5001
   workers: 2
+  redis_url: "redis://langfuse-redis:6379/1"

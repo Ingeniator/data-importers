@@ -115,18 +115,40 @@ class ServerConfig:
     debug: bool = False
     silence_probes: bool = True
     hide_auth_inputs: bool = False
+    redis_url: str = ""
+
+
+@dataclass(frozen=True)
+class DatasetTarget:
+    """A remote dataset service to import files into."""
+    name: str
+    base_url: str
+    token_url: str
+    client_id: str
+    client_secret: str
+    default_access: str = "organization"
+    default_dataset_type: str = "DATASET"
+    # seconds; 300 comfortably covers 100 MB at ~3 MB/s
+    upload_timeout: int = 300
 
 
 @dataclass(frozen=True)
 class Settings:
     datasources: tuple[Datasource, ...] = ()
     connections: tuple[Connection, ...] = ()
+    targets: tuple[DatasetTarget, ...] = ()
     server: ServerConfig = ServerConfig()
 
     def get_datasource(self, name: str) -> Datasource | None:
         for ds in self.datasources:
             if ds.name == name:
                 return ds
+        return None
+
+    def get_target(self, name: str) -> DatasetTarget | None:
+        for t in self.targets:
+            if t.name == name:
+                return t
         return None
 
     @property
@@ -146,6 +168,12 @@ def _parse_connection(raw: dict) -> Connection:
     return Connection(**filtered)
 
 
+def _parse_target(raw: dict) -> DatasetTarget:
+    known_fields = {f.name for f in DatasetTarget.__dataclass_fields__.values()}
+    filtered = {k: v for k, v in raw.items() if k in known_fields}
+    return DatasetTarget(**filtered)
+
+
 def load_config(path: str | Path) -> Settings:
     text = Path(path).read_text()
     text = _resolve_vault_refs(text, _load_vault_secrets(VAULT_SECRETS_PATH))
@@ -158,9 +186,13 @@ def load_config(path: str | Path) -> Settings:
     connections_raw = raw.get("connections", [])
     connections = tuple(_parse_connection(c) for c in connections_raw)
 
+    targets_raw = raw.get("targets", [])
+    targets = tuple(_parse_target(t) for t in targets_raw)
+
     return Settings(
         datasources=datasources,
         connections=connections,
+        targets=targets,
         server=ServerConfig(**raw.get("server", {})),
     )
 

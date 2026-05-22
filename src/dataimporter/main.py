@@ -11,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response as StarletteResponse
 
 from dataimporter.config import Settings, get_settings
+from dataimporter.routes.export import router as export_router
 from dataimporter.routes.logs import router as logs_router
 from dataimporter.routes.media import router as media_router
 from dataimporter.routes.proxy import router as proxy_router
@@ -38,6 +39,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestIDMiddleware)
 
+app.include_router(export_router)
 app.include_router(logs_router)
 app.include_router(media_router)
 app.include_router(proxy_router)
@@ -185,5 +187,13 @@ def ui_config(settings: Settings = Depends(get_settings)) -> dict:
                 "has_credentials": bool(c.public_key and c.secret_key),
             }
             for c in settings.connections
+        ],
+        "targets": [
+            {
+                "name": t.name,
+                "default_access": t.default_access,
+                "default_dataset_type": t.default_dataset_type,
+            }
+            for t in settings.targets
         ],
     }

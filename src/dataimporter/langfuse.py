@@ -50,56 +50,51 @@ async def search_logs_langfuse(
     if session_id:
         params["sessionId"] = session_id
 
-    try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            if trace_id:
-                resp = await client.get(f"{base}/api/public/traces/{trace_id}", auth=auth)
-                resp.raise_for_status()
-                trace = resp.json()
-                traces = [trace]
-            else:
-                resp = await client.get(f"{base}/api/public/traces", params=params, auth=auth)
-                resp.raise_for_status()
-                data = resp.json()
-                traces = data.get("data", [])
+    async with httpx.AsyncClient(timeout=30) as client:
+        if trace_id:
+            resp = await client.get(f"{base}/api/public/traces/{trace_id}", auth=auth)
+            resp.raise_for_status()
+            trace = resp.json()
+            traces = [trace]
+        else:
+            resp = await client.get(f"{base}/api/public/traces", params=params, auth=auth)
+            resp.raise_for_status()
+            data = resp.json()
+            traces = data.get("data", [])
 
-            results = []
-            for t in traces:
-                body = {
-                    "input": t.get("input"),
-                    "output": t.get("output"),
-                    "metadata": t.get("metadata"),
-                }
-                name = t.get("name", "")
+        results = []
+        for t in traces:
+            body = {
+                "input": t.get("input"),
+                "output": t.get("output"),
+                "metadata": t.get("metadata"),
+            }
+            name = t.get("name", "")
 
-                if trace_type and name != trace_type:
+            if trace_type and name != trace_type:
+                continue
+
+            if query and query != "*":
+                q = query.lower()
+                searchable = str(body).lower() + name.lower()
+                if q not in searchable:
                     continue
 
-                if query and query != "*":
-                    q = query.lower()
-                    searchable = str(body).lower() + name.lower()
-                    if q not in searchable:
-                        continue
+            results.append({
+                "id": t.get("id", ""),
+                "type": "trace",
+                "timestamp": t.get("timestamp", ""),
+                "trace_id": t.get("id", ""),
+                "session_id": t.get("sessionId", ""),
+                "name": name,
+                "body": body,
+                "tags": t.get("tags", []),
+                "latency": t.get("latency"),
+                "total_cost": t.get("totalCost"),
+                "usage": t.get("usage"),
+            })
 
-                results.append({
-                    "id": t.get("id", ""),
-                    "type": "trace",
-                    "timestamp": t.get("timestamp", ""),
-                    "trace_id": t.get("id", ""),
-                    "session_id": t.get("sessionId", ""),
-                    "name": name,
-                    "body": body,
-                    "tags": t.get("tags", []),
-                    "latency": t.get("latency"),
-                    "total_cost": t.get("totalCost"),
-                    "usage": t.get("usage"),
-                })
-
-            return results[:limit]
-
-    except Exception as e:
-        logger.error("langfuse_search_failed", error=str(e))
-        return []
+        return results[:limit]
 
 
 async def ping_langfuse(ds: Datasource) -> None:

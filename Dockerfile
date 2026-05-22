@@ -15,6 +15,7 @@ WORKDIR /app
 COPY --from=builder /app/.venv /app/.venv
 COPY config.yaml .
 COPY entrypoint.py .
+COPY worker_entrypoint.py .
 
 ENV PATH="/app/.venv/bin:$PATH"
 

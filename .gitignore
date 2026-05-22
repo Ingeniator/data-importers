@@ -1,1 +1,2 @@
-src/dataimporter/__pycache__/*
+src/dataimporter/**/__pycache__/*
+*.pyc

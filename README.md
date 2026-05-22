@@ -1,6 +1,6 @@
 # dataimporter
 
-Browse and search LLM logs stored in external backends.
+Browse and search LLM logs stored in external backends. Import selected data into a dataset service.
 
 Read-only companion to [llogr](../llogr) (which handles data ingestion).
 
@@ -81,6 +81,24 @@ connections:
 
 When `public_key` and `secret_key` are set on a connection, users can add it without entering credentials (the server-side keys are used as defaults). Users can still override with their own keys.
 
+### Dataset targets (import destination)
+
+Defines external dataset services that users can import S3 files into. Tokens are obtained automatically via OAuth2 client credentials flow (Keycloak-compatible).
+
+```yaml
+targets:
+  - name: "Production Dataset Service"
+    base_url: "https://ds.example.com"
+    token_url: "https://keycloak.example.com/realms/prod/protocol/openid-connect/token"
+    client_id: "vault:DS_CLIENT_ID"
+    client_secret: "vault:DS_CLIENT_SECRET"
+    default_access: "organization"       # pre-selected access level in UI
+    default_dataset_type: "DATASET"      # pre-selected dataset type in UI
+    upload_timeout: 300                  # seconds; default 300, increase for slow links
+```
+
+If no targets are configured the import button does not appear in the UI.
+
 ### Server settings
 
 ```yaml
@@ -91,7 +109,10 @@ server:
   workers: 2
   hide_auth_inputs: true       # hide pk/sk fields in the UI
   silence_probes: true         # suppress health check logs
+  redis_url: "redis://redis:6379/1"  # optional — enables import queue
 ```
+
+`redis_url` is optional. Without it imports run synchronously (one at a time is not enforced — concurrent imports from different users each consume memory for the full file set). With it, imports are serialised through a single arq worker (`max_jobs=1`), preventing simultaneous OOM from large files.
 
 ### Vault secrets
 
@@ -105,14 +126,56 @@ datasources:
 ```
 
 Set `VAULT_SECRETS_PATH` (default `/vault/secrets/env`) to the file containing `CH_PASSWORD=...`.
+Supported formats: `KEY=value`, `export KEY=value`, `KEY: value`.
 
 ## Running
 
+**API server:**
 ```bash
 uv run python entrypoint.py
 ```
 
+**Import worker** (required for queue-based import, needs `redis_url` configured):
+```bash
+uv run python worker_entrypoint.py
+```
+
 The web UI is at `/`, API at `/api/public/`.
+
+## Import flow
+
+Users can import selected S3 files into a configured dataset service directly from the browser UI:
+
+1. Browse or search files in an S3 datasource
+2. Select files (or use all results)
+3. Click **Import to dataset service**
+4. Set a dataset name (pre-filled from source name + time range), access level, and dataset type
+5. Click **Import**
+
+**With Redis configured:** the job is enqueued and the UI shows a live progress bar (polling every 2 s). The worker processes one import at a time, preventing concurrent memory spikes from large files.
+
+**Without Redis:** the import runs synchronously in the API server and completes before the response is returned. A warning is shown in the UI. Concurrent imports from different users are possible — each reads files into memory, so avoid large concurrent imports on memory-constrained deployments.
+
+Files are streamed from S3 into memory one at a time and uploaded to the dataset service via multipart form upload. The `upload_timeout` setting controls the per-file upload deadline (default 300 s, enough for 100 MB at ~3 MB/s).
+
+## Mock dataset service
+
+A local mock of the dataset service is included for testing the import UX:
+
+```bash
+uv run python tests/mock_dataset_service.py --port 9100
+```
+
+The mock prints a `config.yaml` snippet on startup. It stores uploaded files in `/tmp/mock-dataset-service` (override with `--upload-dir`).
+
+Inspect what was imported:
+```
+GET http://localhost:9100/_mock/datasets          — list datasets
+GET http://localhost:9100/_mock/datasets/{id}     — dataset detail and file list
+GET http://localhost:9100/_mock/files/{id}        — download an uploaded file
+```
+
+In the Docker Compose stack, the mock runs as the `dataset-mock` service and is pre-wired as a target in `config.gateway.yaml`.
 
 ## Endpoints
 
@@ -125,9 +188,19 @@ The web UI is at `/`, API at `/api/public/`.
 | `GET /api/public/media/{id}` | Fetch media metadata + presigned URL |
 | `POST /api/public/proxy/search` | Search via user-connected datasource |
 | `POST /api/public/proxy/ping` | Test a user connection |
+| `POST /api/public/export/dataset` | Enqueue (or run) a dataset import |
+| `GET /api/public/export/status/{job_id}` | Poll import job status and progress |
 | `GET /api/public/datasources` | List configured datasources |
-| `GET /api/public/ui-config` | UI configuration (datasources + connections) |
+| `GET /api/public/ui-config` | UI configuration (datasources, connections, targets) |
 | `GET /livez` | Liveness probe |
 | `GET /ready` | Readiness probe |
 | `GET /health` | Detailed health status |
 | `GET /metrics` | Prometheus metrics |
+
+## Observability
+
+Prometheus metrics are exposed at `/metrics`. The `dataimporter` Grafana dashboard (provisioned automatically in the Docker Compose stack) covers:
+
+- **Import intensity** — files/s and bytes/s per datasource, import duration P50/P95, failure rate
+- **Memory** — process RSS over time with threshold markers (yellow at 60 %, red at 90 % of the 512 MB container limit), memory % of limit stat, CPU usage
+- **GC** — Python garbage collection rate per generation
