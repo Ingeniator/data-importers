@@ -23,6 +23,10 @@ async def import_dataset(
     dataset_name: str,
     access: str,
     dataset_type: str,
+    sampling: list[dict] | None = None,
+    strict_schema: bool = False,
+    schema_snapshot: dict[str, str] | None = None,
+    max_traces: int | None = None,
 ) -> dict:
     from dataimporter import dataset_service
     from dataimporter.metrics import IMPORT_BYTES, IMPORT_FILES, IMPORT_SECONDS
@@ -38,6 +42,17 @@ async def import_dataset(
     ds = settings.get_datasource(datasource)
     if not ds:
         raise ValueError(f"Datasource '{datasource}' not found in config")
+
+    sampling_warning: str | None = None
+    if sampling:
+        import asyncio
+        from dataimporter.sampling import SamplingRule, apply_sampling_s3
+        rules = [SamplingRule(**r) for r in sampling]
+        keys, sampling_warning = await asyncio.to_thread(
+            apply_sampling_s3, keys, rules, ds, strict_schema, schema_snapshot, max_traces,
+        )
+        if sampling_warning:
+            logger.warning("sampling_warning", warning=sampling_warning)
 
     async def _set_progress(done: int, total: int, bytes_done: int) -> None:
         await redis.hset(
@@ -84,6 +99,7 @@ async def import_dataset(
         "files_uploaded": uploaded,
         "files_failed": len(failed),
         "failed": failed,
+        "sampling_warning": sampling_warning,
     }
 
 

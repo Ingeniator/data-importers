@@ -15,6 +15,7 @@ from dataimporter.routes.export import router as export_router
 from dataimporter.routes.logs import router as logs_router
 from dataimporter.routes.media import router as media_router
 from dataimporter.routes.proxy import router as proxy_router
+from dataimporter.routes.sample import router as sample_router
 from dataimporter.routes.search import router as search_router
 from dataimporter.routes.ui import router as ui_router
 
@@ -43,6 +44,7 @@ app.include_router(export_router)
 app.include_router(logs_router)
 app.include_router(media_router)
 app.include_router(proxy_router)
+app.include_router(sample_router)
 app.include_router(search_router)
 app.include_router(ui_router)
 

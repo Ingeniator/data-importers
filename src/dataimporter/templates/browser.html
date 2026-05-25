@@ -93,6 +93,48 @@
   .import-status.err { background: #fee2e2; color: #991b1b; }
   .import-status.info { background: #eff6ff; color: #1e40af; }
 
+  /* Sampling UI */
+  .samp-toggle { display: flex; align-items: center; gap: 8px; margin-top: 14px; }
+  .samp-toggle button { background: none; border: 1px solid #d1d5db; border-radius: 4px; padding: 6px 12px; font-size: .82rem; cursor: pointer; color: #555; display: flex; align-items: center; gap: 5px; }
+  .samp-toggle button:hover { border-color: #9ca3af; color: #333; }
+  .samp-toggle button.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+  .samp-panel { margin-top: 10px; border: 1px solid #e5e7eb; border-radius: 6px; padding: 12px; background: #fafafa; }
+  .samp-schema { font-size: .78rem; color: #666; margin-bottom: 10px; }
+  .samp-schema-fields { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+  .samp-field-chip { background: #e0e7ff; color: #3730a3; border-radius: 3px; padding: 2px 7px; font-size: .75rem; font-family: monospace; }
+  .samp-field-chip.unavail { background: #f3f4f6; color: #9ca3af; }
+  .samp-schema-empty { font-style: italic; color: #aaa; }
+  .samp-strict { display: flex; align-items: center; gap: 6px; font-size: .82rem; color: #555; margin-bottom: 10px; cursor: pointer; }
+  .samp-strict input { width: auto; margin: 0; cursor: pointer; }
+  .samp-max { display: flex; align-items: center; gap: 8px; font-size: .82rem; margin-bottom: 10px; }
+  .samp-max label { font-weight: 600; font-size: .82rem; margin: 0; white-space: nowrap; }
+  .samp-max input { width: 90px; padding: 4px 6px; font-size: .82rem; }
+  .samp-rules { display: flex; flex-direction: column; gap: 8px; margin-bottom: 10px; }
+  .samp-rule { background: #fff; border: 1px solid #e5e7eb; border-radius: 5px; padding: 10px 12px; }
+  .samp-rule-header { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .samp-rule-name { font-weight: 600; font-size: .85rem; flex: 1; min-width: 110px; }
+  .samp-rule-rate { display: flex; align-items: center; gap: 4px; font-size: .82rem; }
+  .samp-rule-rate input { width: 56px; padding: 4px 6px; font-size: .82rem; text-align: right; }
+  .samp-rule-remove { margin-left: auto; background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 1rem; padding: 0 2px; }
+  .samp-rule-remove:hover { color: #dc2626; }
+  .samp-rule-params { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-end; }
+  .samp-rule-params .fp { display: flex; flex-direction: column; gap: 2px; }
+  .samp-rule-params label { font-size: .75rem; font-weight: 600; color: #555; margin: 0; }
+  .samp-rule-params input, .samp-rule-params select { padding: 4px 6px; font-size: .82rem; border: 1px solid #ddd; border-radius: 4px; width: auto; min-width: 90px; }
+  .samp-rule-params select { min-width: 110px; }
+  .samp-rule-desc { margin-top: 8px; }
+  .samp-rule-desc details { font-size: .78rem; color: #666; }
+  .samp-rule-desc summary { cursor: pointer; color: #2563eb; font-size: .78rem; list-style: none; }
+  .samp-rule-desc summary::before { content: 'ℹ '; }
+  .samp-rule-desc p { margin: 4px 0 0; line-height: 1.5; }
+  .samp-rule-desc ul { margin: 3px 0 0 14px; padding: 0; line-height: 1.6; }
+  .samp-rule.unavail { opacity: .55; }
+  .samp-add-row { display: flex; gap: 8px; align-items: center; }
+  .samp-add-row select { flex: 1; padding: 6px 8px; font-size: .82rem; border: 1px solid #ddd; border-radius: 4px; }
+  .samp-add-row button { padding: 6px 12px; font-size: .82rem; white-space: nowrap; }
+  .samp-yield { margin-top: 8px; font-size: .78rem; color: #555; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 4px; padding: 5px 10px; }
+  .samp-yield.warn { background: #fefce8; border-color: #fde68a; color: #854d0e; }
+
   /* Import progress */
   .import-progress { padding: 4px 0; }
   .status-badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: .75rem; font-weight: 700; letter-spacing: .02em; text-transform: uppercase; margin-bottom: 12px; }
@@ -989,7 +1031,345 @@ function suggestDatasetName() {
   return parts.filter(Boolean).join('_');
 }
 
+// ── Sampling state ──────────────────────────────────────────────────────────
+let _sampSchema = {};      // { fieldName: {type, example} }
+let _sampRules = [];       // array of rule objects
+let _sampOpen = false;
+let _sampMode = 's3';      // current import mode
+let _sampKeys = [];        // keys available for schema discovery
+
+const STRATEGY_CATALOG = {
+  random: {
+    label: 'Random',
+    requiredFields: [],
+    extraParams: [
+      { key: 'seed', label: 'Seed (optional)', type: 'number', placeholder: 'e.g. 42' },
+    ],
+    desc: {
+      purpose: 'Baseline health monitoring.',
+      best_for: 'Overall quality estimation, regression monitoring, discovering unknown unknowns.',
+      advantages: 'Unbiased, simple, statistically meaningful.',
+      weaknesses: 'Misses rare failures, inefficient use of annotation budget.',
+    },
+  },
+  high_cost: {
+    label: 'High-Cost',
+    requiredFields: ['total_cost', 'totalCost', 'token_count', 'usage'],
+    extraParams: [
+      { key: 'percentile', label: 'Percentile', type: 'select', options: ['75','90','95','99'], default: '95' },
+    ],
+    desc: {
+      purpose: 'Detect inefficient reasoning or tool usage.',
+      signals: 'High token count, many tool calls, long chains, excessive retries.',
+      best_for: 'Agent optimization, cost reduction, loop detection.',
+      weaknesses: 'Expensive traces are not always bad.',
+    },
+  },
+  latency_spike: {
+    label: 'Latency Spike',
+    requiredFields: ['latency', 'latency_ms', 'duration_ms'],
+    extraParams: [
+      { key: 'percentile', label: 'Percentile', type: 'select', options: ['75','90','95','99'], default: '95' },
+    ],
+    desc: {
+      purpose: 'Diagnose slow reasoning.',
+      signals: 'p95/p99 latency, stalled spans, slow retrieval, excessive planning.',
+      best_for: 'Real-time agents, interactive assistants.',
+      advantages: 'Connects quality with UX.',
+    },
+  },
+  long_trace: {
+    label: 'Long Trace',
+    requiredFields: ['span_count', 'observation_count', 'depth'],
+    extraParams: [
+      { key: 'threshold', label: 'Min spans', type: 'number', placeholder: 'e.g. 10' },
+    ],
+    desc: {
+      purpose: 'Detect loops and reasoning degradation.',
+      signals: 'Many spans, deep recursion, repeated actions.',
+      best_for: 'Autonomous agents, planning systems, tool-using agents.',
+      weaknesses: 'Some legitimate workflows are naturally long.',
+    },
+  },
+  failure: {
+    label: 'Failure',
+    requiredFields: ['level', 'error', 'status_code', 'is_error'],
+    extraParams: [
+      { key: 'values', label: 'Failure values', type: 'text', placeholder: 'error,failed,failure' },
+    ],
+    desc: {
+      purpose: 'Capture error cases for debugging.',
+      signals: 'Error flags, non-200 status codes, exception traces.',
+      best_for: 'Reliability monitoring, root cause analysis.',
+      weaknesses: 'May over-index on known error patterns.',
+    },
+  },
+  user_dissatisfaction: {
+    label: 'User Dissatisfaction',
+    requiredFields: ['score', 'tags'],
+    extraParams: [
+      { key: 'threshold', label: 'Score threshold (below)', type: 'number', placeholder: 'e.g. 0' },
+      { key: 'thumbsdown_tags', label: 'Negative tags', type: 'text', placeholder: 'thumbsdown,dislike' },
+    ],
+    desc: {
+      purpose: 'Capture poor user experiences.',
+      signals: 'Negative scores, thumbsdown tags, low ratings.',
+      best_for: 'User-facing assistants, feedback-driven improvement.',
+      advantages: 'Aligns annotation with user impact.',
+    },
+  },
+  business_critical: {
+    label: 'Business-Critical',
+    requiredFields: ['tags', 'metadata'],
+    extraParams: [
+      { key: 'match_type', label: 'Match type', type: 'select', options: ['contains','equals'], default: 'contains' },
+      { key: 'value', label: 'Value', type: 'text', placeholder: 'e.g. critical' },
+    ],
+    desc: {
+      purpose: 'Ensure coverage of high-stakes interactions.',
+      signals: 'User-defined tag or metadata field/value.',
+      best_for: 'Regulated domains, SLA-bound workflows, VIP users.',
+      advantages: 'Guarantees representation of important cases.',
+    },
+  },
+  prompt_version_change: {
+    label: 'Prompt/Version Change',
+    requiredFields: ['version', 'model', 'prompt_hash', 'prompt_version'],
+    extraParams: [
+      { key: 'baseline', label: 'Baseline value', type: 'text', placeholder: 'e.g. gpt-4o' },
+    ],
+    desc: {
+      purpose: 'Regression detection across prompt or model versions.',
+      signals: 'Field differs from a specified baseline value.',
+      best_for: 'A/B prompt testing, model upgrades, prompt iteration.',
+      weaknesses: 'Only meaningful when version metadata is present.',
+    },
+  },
+  low_confidence: {
+    label: 'Low Confidence',
+    requiredFields: ['confidence', 'logprob', 'score'],
+    extraParams: [
+      { key: 'threshold', label: 'Threshold (below)', type: 'number', placeholder: 'e.g. 0.5' },
+    ],
+    desc: {
+      purpose: 'Capture uncertain model outputs for review.',
+      signals: 'Confidence, logprob, or model-output score below threshold.',
+      best_for: 'Classification tasks, RAG pipelines, uncertainty-aware systems.',
+      weaknesses: 'Not all systems expose confidence; logprob is not always calibrated.',
+    },
+  },
+  weird_tool_sequences: {
+    label: 'Weird Tool Sequences',
+    requiredFields: ['tool_calls', 'tools', 'tool_use', 'observations'],
+    extraParams: [
+      { key: 'max_repeat', label: 'Max same-tool repeats', type: 'number', placeholder: 'e.g. 3' },
+      { key: 'min_total_calls', label: 'Min total tool calls', type: 'number', placeholder: 'e.g. 10' },
+      { key: 'unexpected_tools', label: 'Unexpected tool names', type: 'text', placeholder: 'tool_a,tool_b' },
+    ],
+    desc: {
+      purpose: 'Detect abnormal or pathological tool usage patterns.',
+      signals: 'Same tool called repeatedly, excessive total calls, unexpected tool names.',
+      best_for: 'Tool-using agents, ReAct loops, multi-step planners.',
+      weaknesses: 'Requires structured tool call data; thresholds are system-specific.',
+    },
+  },
+};
+
+function _strategyAvailable(stratKey) {
+  const def = STRATEGY_CATALOG[stratKey];
+  if (!def || !def.requiredFields || def.requiredFields.length === 0) return true;
+  return def.requiredFields.some(f => _sampSchema[f] !== undefined);
+}
+
+function _availableFieldsForStrategy(stratKey) {
+  const def = STRATEGY_CATALOG[stratKey];
+  if (!def || !def.requiredFields || def.requiredFields.length === 0) return Object.keys(_sampSchema);
+  const matching = def.requiredFields.filter(f => _sampSchema[f] !== undefined);
+  return matching.length ? matching : Object.keys(_sampSchema);
+}
+
+function _renderStrategyDesc(def) {
+  const d = def.desc;
+  const rows = [
+    d.purpose   ? '<li><b>Purpose:</b> ' + esc(d.purpose) + '</li>' : '',
+    d.signals   ? '<li><b>Signals:</b> ' + esc(d.signals) + '</li>' : '',
+    d.best_for  ? '<li><b>Best for:</b> ' + esc(d.best_for) + '</li>' : '',
+    d.advantages? '<li><b>Advantages:</b> ' + esc(d.advantages) + '</li>' : '',
+    d.weaknesses? '<li><b>Weaknesses:</b> ' + esc(d.weaknesses) + '</li>' : '',
+  ].filter(Boolean).join('');
+  return '<div class="samp-rule-desc"><details><summary>What is this?</summary><ul>' + rows + '</ul></details></div>';
+}
+
+function _renderFieldSelect(ruleIdx, selectedField, stratKey) {
+  const fields = _availableFieldsForStrategy(stratKey);
+  if (!fields.length) return '';
+  const opts = fields.map(f =>
+    '<option value="' + esc(f) + '"' + (f === selectedField ? ' selected' : '') + '>' + esc(f) + '</option>'
+  ).join('');
+  return '<div class="fp"><label>Field</label><select onchange="_sampRules[' + ruleIdx + '].field=this.value">' + opts + '</select></div>';
+}
+
+function _renderExtraParams(ruleIdx, rule, def) {
+  if (!def.extraParams || !def.extraParams.length) return '';
+  return def.extraParams.map(p => {
+    const val = rule.params[p.key] !== undefined ? rule.params[p.key] : (p.default || '');
+    const onChange = '_sampRules[' + ruleIdx + '].params["' + p.key + '"]=this.value';
+    if (p.type === 'select') {
+      const opts = p.options.map(o => '<option value="' + o + '"' + (String(val) === o ? ' selected' : '') + '>' + o + '</option>').join('');
+      return '<div class="fp"><label>' + esc(p.label) + '</label><select onchange="' + onChange + '">' + opts + '</select></div>';
+    }
+    return '<div class="fp"><label>' + esc(p.label) + '</label><input type="' + p.type + '" value="' + esc(String(val)) + '" placeholder="' + esc(p.placeholder || '') + '" onchange="' + onChange + '"></div>';
+  }).join('');
+}
+
+function _renderRules() {
+  if (!_sampRules.length) {
+    document.getElementById('imp_rules').innerHTML = '<div style="font-size:.8rem;color:#aaa;padding:4px 0">No strategies added — all traces will be imported.</div>';
+    _renderYield();
+    return;
+  }
+  const html = _sampRules.map((rule, i) => {
+    const def = STRATEGY_CATALOG[rule.strategy];
+    if (!def) return '';
+    const avail = _strategyAvailable(rule.strategy);
+    const needsField = def.requiredFields && def.requiredFields.length > 0;
+    return '<div class="samp-rule' + (avail ? '' : ' unavail') + '">' +
+      '<div class="samp-rule-header">' +
+        '<span class="samp-rule-name">' + esc(def.label) + (avail ? '' : ' <span style="font-weight:400;color:#f59e0b;font-size:.73rem">⚠ field not in schema</span>') + '</span>' +
+        '<div class="samp-rule-rate">' +
+          '<input type="number" min="1" max="100" value="' + rule.rate + '" onchange="_sampRules[' + i + '].rate=parseFloat(this.value)||1;_renderYield()">' +
+          '<span>%</span>' +
+        '</div>' +
+        '<button class="samp-rule-remove" onclick="removeSampRule(' + i + ')" title="Remove">✕</button>' +
+      '</div>' +
+      '<div class="samp-rule-params">' +
+        (needsField ? _renderFieldSelect(i, rule.field, rule.strategy) : '') +
+        _renderExtraParams(i, rule, def) +
+      '</div>' +
+      _renderStrategyDesc(def) +
+    '</div>';
+  }).join('');
+  document.getElementById('imp_rules').innerHTML = html;
+  _renderYield();
+}
+
+function _renderYield() {
+  const el = document.getElementById('imp_yield');
+  if (!el) return;
+  if (!_sampRules.length) { el.style.display = 'none'; return; }
+  const totalRate = _sampRules.reduce((s, r) => s + (parseFloat(r.rate) || 0), 0);
+  const est = Math.min(100, Math.round(totalRate * 0.85));
+  const isHigh = est >= 95;
+  el.style.display = 'block';
+  el.className = 'samp-yield' + (isHigh ? ' warn' : '');
+  el.textContent = isHigh
+    ? '⚠ Est. yield ≈ ' + est + '% — config may include nearly all traces'
+    : 'Est. yield ≈ ' + est + '% of input traces (rough estimate; deduped)';
+}
+
+function addSampRule() {
+  const sel = document.getElementById('imp_strat_select');
+  const stratKey = sel.value;
+  const def = STRATEGY_CATALOG[stratKey];
+  if (!def) return;
+  const fields = _availableFieldsForStrategy(stratKey);
+  _sampRules.push({ strategy: stratKey, rate: 10, field: fields[0] || null, params: {} });
+  _renderRules();
+}
+
+function removeSampRule(i) {
+  _sampRules.splice(i, 1);
+  _renderRules();
+}
+
+function toggleSampling() {
+  _sampOpen = !_sampOpen;
+  const btn = document.getElementById('imp_samp_btn');
+  const panel = document.getElementById('imp_samp_panel');
+  if (_sampOpen) {
+    btn.classList.add('active');
+    btn.textContent = '⚙ Sampling ▲';
+    panel.style.display = 'block';
+    if (!Object.keys(_sampSchema).length) _loadSampSchema();
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '⚙ Configure Sampling ▼';
+    panel.style.display = 'none';
+  }
+}
+
+async function _loadSampSchema() {
+  const schemaArea = document.getElementById('imp_schema_area');
+  schemaArea.innerHTML = '<span style="color:#aaa;font-size:.78rem">Loading schema…</span>';
+  try {
+    const params = new URLSearchParams({ datasource: activeDs.name });
+    if (_sampMode === 's3') {
+      _sampKeys.slice(0, 5).forEach(k => params.append('keys', k));
+    }
+    // pass active filters if available
+    const fromEl = document.getElementById('time_from');
+    const toEl   = document.getElementById('time_to');
+    if (fromEl && fromEl.value) params.set('start', new Date(fromEl.value).toISOString());
+    if (toEl   && toEl.value)   params.set('end',   new Date(toEl.value).toISOString());
+    ['f_session','f_trace','f_tracetype','f_hash'].forEach((id, j) => {
+      const fld = ['session_id','trace_id','trace_type','input_hash'][j];
+      const el = document.getElementById(id);
+      if (el && el.value.trim()) params.set(fld, el.value.trim());
+    });
+
+    const resp = await fetch(BASE + '/api/public/datasource/sample?' + params, {
+      headers: { 'Authorization': authHeader() },
+    });
+    if (!resp.ok) throw new Error((await resp.json().catch(() => ({}))).detail || resp.statusText);
+    const data = await resp.json();
+    _sampSchema = data.fields || {};
+    _renderSchemaChips();
+    document.getElementById('imp_samp_options').style.display = 'block';
+  } catch (e) {
+    schemaArea.innerHTML = '<span style="color:#dc2626;font-size:.78rem">Schema load failed: ' + esc(e.message) + '</span>';
+  }
+}
+
+function _renderSchemaChips() {
+  const schemaArea = document.getElementById('imp_schema_area');
+  const keys = Object.keys(_sampSchema);
+  if (!keys.length) {
+    schemaArea.innerHTML = '<div class="samp-schema"><span class="samp-schema-empty">No fields discovered</span></div>';
+    return;
+  }
+  const chips = keys.map(f => {
+    const info = _sampSchema[f];
+    return '<span class="samp-field-chip" title="' + esc(info.type) + (info.example !== null ? ': ' + esc(String(info.example)) : '') + '">' + esc(f) + ' <span style="opacity:.6">' + esc(info.type) + '</span></span>';
+  }).join('');
+  schemaArea.innerHTML = '<div class="samp-schema"><b>Schema</b> (' + keys.length + ' fields from ' + (activeDs ? esc(activeDs.name) : '') + '):<div class="samp-schema-fields">' + chips + '</div></div>';
+}
+
+function _buildSampPanel() {
+  const stratOpts = Object.entries(STRATEGY_CATALOG).map(([k, v]) => {
+    const avail = _strategyAvailable(k);
+    return '<option value="' + k + '"' + (avail ? '' : '') + '>' + esc(v.label) + (avail ? '' : ' (field missing)') + '</option>';
+  }).join('');
+  return '<div id="imp_samp_panel" style="display:none" class="samp-panel">' +
+    '<div id="imp_schema_area"><span style="color:#aaa;font-size:.78rem">Click to load schema</span></div>' +
+    '<div id="imp_samp_options" style="display:none">' +
+      '<label class="samp-strict"><input type="checkbox" id="imp_strict"> Ignore traces with mismatched structure</label>' +
+      '<div class="samp-max"><label>Max traces</label><input type="number" id="imp_max_traces" placeholder="no limit" min="1" style="width:100px"></div>' +
+      '<div class="samp-rules" id="imp_rules"></div>' +
+      '<div class="samp-add-row">' +
+        '<select id="imp_strat_select">' + stratOpts + '</select>' +
+        '<button class="btn-secondary btn-sm" onclick="addSampRule()">+ Add strategy</button>' +
+      '</div>' +
+      '<div id="imp_yield" class="samp-yield" style="display:none"></div>' +
+    '</div>' +
+  '</div>';
+}
+
 function showImportModal(mode) {
+  _sampOpen = false;
+  _sampRules = [];
+  _sampSchema = {};
+  _sampMode = mode;
+
   const t = targets[0];
   const targetOptions = targets.map(t =>
     '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>'
@@ -1008,6 +1388,10 @@ function showImportModal(mode) {
     : (selectedCount || currentEvents.length);
   const hint = selectedCount ? selectedCount + ' file(s) selected' : 'All ' + totalCount + ' result(s)';
 
+  // Collect keys for schema discovery
+  const keys = _collectKeys(mode);
+  _sampKeys = keys || [];
+
   showModal('Import to dataset service', '');
   document.querySelector('.modal-body').innerHTML =
     '<div class="import-form" id="imp_form">' +
@@ -1020,6 +1404,10 @@ function showImportModal(mode) {
       '<select id="imp_access">' + accessOptions + '</select>' +
       '<label>Dataset type</label>' +
       '<select id="imp_type">' + typeOptions + '</select>' +
+      '<div class="samp-toggle">' +
+        '<button type="button" id="imp_samp_btn" onclick="toggleSampling()">⚙ Configure Sampling ▼</button>' +
+      '</div>' +
+      _buildSampPanel() +
       '<div id="imp_status"></div>' +
       '<div class="actions">' +
         '<button class="btn-secondary" onclick="closeModal()">Cancel</button>' +
@@ -1064,11 +1452,31 @@ async function submitImport(mode) {
   document.getElementById('imp_submit').disabled = true;
   statusDiv.innerHTML = '<div class="import-status info">Queuing import...</div>';
 
+  // Collect sampling config
+  const samplingPayload = _sampRules.length ? _sampRules.map(r => ({
+    strategy: r.strategy,
+    rate: parseFloat(r.rate) || 1,
+    field: r.field || null,
+    params: r.params || {},
+  })) : null;
+  const strictSchema = document.getElementById('imp_strict') ? document.getElementById('imp_strict').checked : false;
+  const maxTracesEl = document.getElementById('imp_max_traces');
+  const maxTraces = maxTracesEl && maxTracesEl.value ? parseInt(maxTracesEl.value) : null;
+  const schemaSnapshot = Object.keys(_sampSchema).length
+    ? Object.fromEntries(Object.entries(_sampSchema).map(([k,v]) => [k, v.type]))
+    : null;
+
   try {
     const resp = await fetch(BASE + '/api/public/export/dataset', {
       method: 'POST',
       headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target, datasource: activeDs.name, keys, dataset_name: name, access, dataset_type }),
+      body: JSON.stringify({
+        target, datasource: activeDs.name, keys, dataset_name: name, access, dataset_type,
+        sampling: samplingPayload,
+        strict_schema: strictSchema,
+        schema_snapshot: schemaSnapshot,
+        max_traces: maxTraces,
+      }),
     });
     const data = await resp.json();
     if (!resp.ok) {

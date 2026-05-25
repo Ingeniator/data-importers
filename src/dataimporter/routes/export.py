@@ -37,6 +37,10 @@ class ExportRequest(BaseModel):
     dataset_name: str
     access: str = "organization"
     dataset_type: str = "DATASET"
+    sampling: list[dict] | None = None
+    strict_schema: bool = False
+    schema_snapshot: dict[str, str] | None = None
+    max_traces: int | None = None
 
 
 def _resolve_target(name: str, settings: Settings) -> DatasetTarget:
@@ -61,6 +65,19 @@ async def _run_inline(
     req: ExportRequest,
 ) -> dict:
     """Synchronous import path used when Redis is not configured."""
+    keys = req.keys
+    sampling_warning: str | None = None
+
+    if req.sampling:
+        from dataimporter.sampling import SamplingRule, apply_sampling_s3
+        rules = [SamplingRule(**r) for r in req.sampling]
+        keys, sampling_warning = await asyncio.to_thread(
+            apply_sampling_s3, keys, rules, ds,
+            req.strict_schema, req.schema_snapshot, req.max_traces,
+        )
+        if sampling_warning:
+            logger.warning("sampling_warning", warning=sampling_warning)
+
     try:
         dataset_id = await dataset_service.create_dataset(
             target, req.dataset_name, req.access, req.dataset_type,
@@ -76,7 +93,7 @@ async def _run_inline(
 
     s3 = _s3_session(ds)
     async with s3.client("s3", endpoint_url=ds.endpoint, config=_s3_client_config(ds)) as client:
-        for key in req.keys:
+        for key in keys:
             try:
                 obj = await client.get_object(Bucket=ds.bucket, Key=key)
                 content: bytes = await obj["Body"].read()
@@ -100,6 +117,7 @@ async def _run_inline(
         "files_failed": len(failed),
         "failed": failed,
         "bytes_total": bytes_total,
+        "sampling_warning": sampling_warning,
     }
 
 
@@ -127,6 +145,10 @@ async def enqueue_export(
             dataset_name=req.dataset_name,
             access=req.access,
             dataset_type=req.dataset_type,
+            sampling=req.sampling,
+            strict_schema=req.strict_schema,
+            schema_snapshot=req.schema_snapshot,
+            max_traces=req.max_traces,
         )
         return {"job_id": job.job_id, "status": "queued", "warning": None}
 
