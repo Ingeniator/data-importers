@@ -6,6 +6,77 @@ Sampling is configured in the import modal (when user presses "Import Dataset").
 Default: no sampling. User expands the block via "Configure Sampling" button.
 Sampling executes on the backend based on the config sent with the import request.
 
+Sampling controls the **annotation budget** — which traces from the available pool
+are forwarded for human review. It is not about reducing evaluation coverage;
+automated evaluation (checkr) runs on all traces. Sampling only decides what humans
+see.
+
+---
+
+## Mental Model
+
+| Concept | Definition |
+|---|---|
+| **Evaluation coverage** | How many traces checkr scores — default 100%, cost-knob only |
+| **Annotation budget** | How many traces humans can review per day/week — the real constraint |
+| **Sampling strategy** | How the annotation budget is allocated across trace categories |
+| **Sampling rate** | A capture rule applied *within* a category, not globally added |
+
+> **Key insight:** `20% random + 10% high-cost ≠ 30% total`.
+> The same trace can match both criteria.
+> Total = `|union(random_sample, high_cost_sample, ...)|` — typically less than the sum.
+> If the union reaches 100%, disable all sampling and take everything.
+
+---
+
+## Observable Signals
+
+Sampling criteria must come from **observable signals in the trace**, not manual intuition.
+A mature trace contains:
+
+```
+trace_id          session_id        user_id           model
+prompt_version    tool_calls        latency           cost
+token_usage       retrieval_chunks  judge_scores      feedback
+errors            span_tree         retry_count       fallback_used
+```
+
+Sampling = querying this dataset intelligently.
+
+---
+
+## Trace Taxonomy
+
+Before choosing sampling percentages, classify traces into a taxonomy.
+Sampling applied per bucket prevents dominant categories from consuming the entire budget.
+
+```yaml
+trace_type:
+  - simple_answer          # single-turn, no tools
+  - rag_answer             # retrieval-augmented
+  - tool_execution         # one or more tool calls
+  - multi_step_agent       # multi-turn with planning
+  - recovery_flow          # failed + retried + succeeded
+  - human_escalation       # transferred to human
+
+intent:
+  - support_question
+  - data_analysis
+  - code_generation
+  - workflow_automation
+
+risk:
+  - low / medium / high
+
+failure_mode:               # populated only when applicable
+  - retrieval_miss
+  - bad_tool_choice
+  - loop
+  - hallucination
+  - schema_error
+  - timeout
+```
+
 ---
 
 ## New backend endpoint: schema discovery
@@ -41,10 +112,7 @@ its own condition, not a slice of a shared budget.
 
 ```python
 class SamplingRule(BaseModel):
-    strategy: str       # "random" | "high_cost" | "latency_spike" | "long_trace"
-                        # | "failure" | "user_dissatisfaction" | "business_critical"
-                        # | "prompt_version_change" | "low_confidence" | "weird_tool_sequences"
-                        # "novelty" — deferred, requires vector/embedding field (see open questions)
+    strategy: str       # see strategy list below
     rate: float         # 0-100 — percentage of qualifying traces to include
     field: str | None   # field to evaluate (user picks from discovered schema)
     params: dict        # strategy-specific: threshold, percentile, tag_value, seed, etc.
@@ -106,6 +174,7 @@ No error is raised; the dataset is created empty.
 │   latency: float   total_cost: float   tags: list   name: str │
 │                                                               │
 │ [x] Ignore traces with mismatched structure                   │
+│  Max traces: [ no limit ]                                     │
 │                                                               │
 │ + Add Strategy  [ Random ▾ ]                                  │
 │                                                               │
@@ -128,6 +197,8 @@ No error is raised; the dataset is created empty.
 
 ## Strategies available vs. datasource fields
 
+### v1 (implemented)
+
 | Strategy              | Enabled when field exists                             |
 |-----------------------|-------------------------------------------------------|
 | Random                | always                                                |
@@ -141,6 +212,16 @@ No error is raised; the dataset is created empty.
 | Low Confidence        | confidence, logprob, score (as model output field)    |
 | Weird Tool Sequences  | tool_calls, tools, tool_use, observations             |
 
+### v2 (follow-on — see section below)
+
+| Strategy             | Required signal |
+|----------------------|-----------------|
+| Retrieval Failure    | retrieval_similarity, chunk_score, retrieved_chunks |
+| Recovery Behavior    | retry_count, fallback_used, final_success |
+| Judge Disagreement   | human_score + llm_score (needs annotation history) |
+| Drift Detection      | embedding distance from baseline distribution |
+| Active Learning      | composite priority score (composite of all signals) |
+
 ---
 
 ## Strategy descriptions
@@ -148,83 +229,198 @@ No error is raised; the dataset is created empty.
 ### Random Sampling
 **Purpose:** Baseline health monitoring.
 **How it works:** Select random traces uniformly.
-**Best for:** overall quality estimation, regression monitoring, discovering unknown unknowns
-**Advantages:** unbiased, simple, statistically meaningful
-**Weaknesses:** misses rare failures, inefficient use of annotation budget
-**Typical usage:** 1-5% of production traffic
+**Best for:** Overall quality estimation, regression monitoring, discovering unknown unknowns.
+Without stratification by taxonomy bucket, high-traffic categories dominate — consider
+filtering by `trace_type` or `model` before applying random sampling.
+**Advantages:** Unbiased, simple, statistically meaningful.
+**Weaknesses:** Misses rare failures, inefficient use of annotation budget.
+**Typical usage:** 1-5% of production traffic; stratify by `model × workflow × tenant`.
 
 ### High-Cost Sampling
 **Purpose:** Detect inefficient reasoning/tool usage.
-**Signals:** high token count, many tool calls, long chains, excessive retries
-**Best for:** agent optimization, cost reduction, loop detection
-**Advantages:** catches pathological agent behavior
-**Weaknesses:** expensive traces are not always bad
-**Example:** sample if tokens > p95
-
-### Long Trace Sampling
-**Purpose:** Detect loops and reasoning degradation.
-**Signals:** many spans, deep recursion, repeated actions, repeated prompts
-**Best for:** autonomous agents, planning systems, tool-using agents
-**Advantages:** exposes agent instability
-**Weaknesses:** some legitimate workflows are naturally long
+**Signals:** `total_tokens > p95`, `cost_usd > threshold`, `tool_call_count > p95`,
+`context_window_utilization > 80%`.
+**Best for:** Agent optimization, cost reduction, loop detection.
+**Advantages:** Catches pathological agent behavior.
+**Weaknesses:** Expensive traces are not always bad.
+**Params:** `field`, `percentile` (p75/p90/p95/p99).
 
 ### Latency Spike Sampling
 **Purpose:** Diagnose slow reasoning.
-**Signals:** p95/p99 latency, stalled spans, slow retrieval, excessive planning
-**Best for:** real-time agents, interactive assistants
-**Advantages:** connects quality with UX
+**Signals:** `trace.latency > p99`, `slowest_span > threshold`,
+`tool_wait_time / total_time > threshold`.
+**Best for:** Real-time agents, interactive assistants.
+**Advantages:** Connects quality with UX.
+**Params:** `field`, `percentile`.
+
+### Long Trace Sampling
+**Purpose:** Detect loops and reasoning degradation.
+**Signals:** `span_count > threshold`, `max_depth > threshold`,
+repeated tool patterns, same prompt called repeatedly.
+**Best for:** Autonomous agents, planning systems, tool-using agents.
+**Advantages:** Exposes agent instability.
+**Weaknesses:** Some legitimate workflows are naturally long.
+**Params:** `field`, `threshold`.
 
 ### Failure Sampling
-**Purpose:** Capture error cases for debugging.
-**Signals:** error flags, non-200 status codes, exception traces
-**Best for:** reliability monitoring, root cause analysis
-**Advantages:** directly surfaces broken behavior
-**Weaknesses:** may over-index on known error patterns
+**Purpose:** Catch regressions before they compound.
+**Signals:** `trace.status == "error"`, `tool.error_count > 0`,
+`response.valid_json == false`, `retry_count > N`,
+first occurrence of a new error pattern, failure rate spike.
+**Best for:** Reliability monitoring, root cause analysis.
+**Advantages:** Directly surfaces broken behavior.
+**Weaknesses:** May over-index on known error patterns.
+**Params:** `field`, `values` (comma-separated failure indicator values).
 
 ### User Dissatisfaction Sampling
-**Purpose:** Capture poor user experiences.
-**Signals:** negative scores, thumbsdown tags, low ratings
-**Best for:** user-facing assistants, feedback-driven improvement
-**Advantages:** aligns annotation with user impact
+**Purpose:** Capture explicit and implicit negative signals.
+**Signals:** `thumbs_down == true`, `user_clicked_regenerate == true`,
+same user repeating question within 5m, conversation abandoned after response,
+transferred to human.
+**Best for:** User-facing assistants, feedback-driven improvement.
+**Advantages:** Aligns annotation with user impact.
+**Params:** `field`, `threshold` (score below), `thumbsdown_tags`.
 
 ### Business-Critical Sampling
-**Purpose:** Ensure coverage of high-stakes interactions.
-**Signals:** user-defined tag or metadata field/value
-**Best for:** regulated domains, SLA-bound workflows, VIP users
-**Advantages:** guarantees representation of important cases
+**Purpose:** Ensure coverage of high-stakes interactions regardless of other signals.
+**Signals:** Workflow in critical list, enterprise tenant, contains payment/approval action.
+**Best for:** Regulated domains, SLA-bound workflows, VIP users.
+**Advantages:** Guarantees representation of important cases.
+**Params:** `field`, `match_type` (contains/equals), `value`.
 
 ### Prompt/Version Change Sampling
 **Purpose:** Regression detection across prompt or model versions.
-**Signals:** version, model, prompt_hash, or prompt_version field differs from a user-specified baseline value
-**How it works:** user picks a field and a baseline value; traces where field ≠ baseline are the pool
-**Best for:** A/B prompt testing, model upgrades, prompt iteration cycles
-**Advantages:** directly targets changed behaviour, focuses annotation where regressions are likely
-**Weaknesses:** only meaningful when version metadata is present in traces
-**Params:** `field` (e.g. `model`), `baseline` (e.g. `gpt-4o`) — samples traces where field ≠ baseline
+**Signals:** `prompt_version != baseline_version`, `model_version changed`,
+`retrieval_index_version changed`, `tool_hash changed`.
+**Best for:** A/B prompt testing, model upgrades, prompt iteration.
+**Advantages:** Directly targets changed behaviour, focuses annotation where regressions are likely.
+Best practice: replay the **same inputs** through old and new system; sample the diffs.
+**Weaknesses:** Only meaningful when version metadata is present.
+**Params:** `field` (e.g. `model`), `baseline` (e.g. `gpt-4o`).
 
 ### Low Confidence Sampling
-**Purpose:** Capture uncertain model outputs for review.
-**Signals:** confidence, logprob, or model-output score below a threshold
-**Best for:** classification tasks, generation with self-assessed uncertainty, RAG pipelines
-**Advantages:** surfaces cases where the model itself signals doubt
-**Weaknesses:** not all systems expose confidence; logprob is not always calibrated
-**Params:** `field` (e.g. `confidence`), `threshold` (e.g. `0.5`) — samples traces where field < threshold
+**Purpose:** Surface cases where the system was uncertain.
+**Signals:** `judge.score_variance > threshold` (LLM judge fluctuates on re-runs),
+`agent.confidence < threshold`, `retrieval_similarity < threshold`,
+`retrieved_docs_conflict == true`.
+**Best for:** Classification tasks, RAG pipelines, uncertainty-aware systems.
+**Weaknesses:** Not all systems expose confidence; logprob is not always calibrated.
+**Params:** `field`, `threshold`.
 
 ### Weird Tool Sequences Sampling
 **Purpose:** Detect abnormal or pathological tool usage patterns.
-**Signals:**
-- same tool called more than N times in one trace (repetition/loop)
-- total tool call count exceeds a threshold (excessive tool use)
-- specific tool names present that are considered unexpected or dangerous
-**Best for:** tool-using agents, ReAct loops, multi-step planners
-**Advantages:** catches stuck agents, runaway loops, misrouted tool calls
-**Weaknesses:** requires structured tool call data; what counts as "weird" depends on the system
-**Params (user-defined):**
-- `field` — field containing the tool calls list (e.g. `tool_calls`, `tools`, `observations`)
-- `max_repeat` — flag traces where any single tool appears more than N times (e.g. `3`)
-- `min_total_calls` — flag traces with more than N tool calls total (e.g. `10`)
-- `unexpected_tools` — comma-separated list of tool names to flag if present (e.g. `delete_file,drop_table`)
-Any one signal firing is sufficient to include the trace in the pool.
+**Signals:** Same tool called repeatedly, excessive total calls, policy-violating
+tool sequence, required tool not called, parallel branches exceed threshold.
+**Best for:** Tool-using agents, ReAct loops, multi-step planners.
+**Weaknesses:** Requires structured tool call data; thresholds are system-specific.
+**Params:** `field`, `max_repeat`, `min_total_calls`, `unexpected_tools`.
+
+---
+
+## Priority Scoring Pipeline (v2)
+
+> Do not build one sampling strategy. Build a **scoring pipeline**.
+
+Instead of applying rules independently and unioning results naively, assign each
+trace a composite priority score and select the top N per budget window:
+
+```
+sampling_priority =
+    failure_weight          * is_failure           +
+    cost_weight             * is_high_cost         +
+    novelty_weight          * novelty_score        +
+    dissatisfaction_weight  * has_negative_signal  +
+    risk_weight             * risk_level           +
+    business_impact_weight  * is_critical_workflow +
+    judge_disagreement_w    * judge_variance       +
+    recovery_weight         * is_recovery_flow
+```
+
+Example weights for an agentic system:
+
+| Signal | Score |
+|---|---|
+| High-risk workflow (payment, auth) | +50 |
+| New / unseen trace category | +30 |
+| Tool error | +25 |
+| Judge score variance > 0.3 | +20 |
+| P95 token cost | +15 |
+| Recovery flow (failed → succeeded) | +15 |
+| Retrieval failure | +15 |
+| Random baseline (always eligible) | +5 |
+
+Select top N traces per day sorted by score descending.
+
+---
+
+## Three-Layer Design (v2)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Layer 1 — Always Include (no budget limit)                 │
+│  · Critical failures (auth down, payment error)             │
+│  · Policy / compliance events                               │
+│  · Security-flagged traces                                  │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 2 — Stratified Sampling (budget: ~60% of daily N)    │
+│  · One sample per taxonomy bucket (trace_type × risk)       │
+│  · Prevents dominant categories from eating the budget      │
+│  · Baseline health coverage across all system behaviors     │
+├─────────────────────────────────────────────────────────────┤
+│  Layer 3 — Exploration (budget: ~40% of daily N)            │
+│  · Novelty / outliers                                       │
+│  · New tool sequences                                       │
+│  · Drift-detected categories                                │
+│  · Active learning top-N by composite priority score        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Example Annotation Budget Allocation (1,000 traces/day)
+
+| Category | Count | Signal |
+|---|---|---|
+| Random stratified baseline | 300 | Health across all categories |
+| Failures / suspicious | 250 | Regression detection |
+| High-risk business flows | 150 | Business-critical coverage |
+| High-cost / long traces | 100 | Agent degradation |
+| Novelty / rare taxonomy | 100 | Blind-spot discovery |
+| Recovery flows | 100 | Model improvement seeds |
+| **Total** | **1,000** | |
+
+This is **not** "X% of all traces". It is an **evaluation budget allocation** across
+trace categories defined by the taxonomy.
+
+---
+
+## Practical Starting Configuration
+
+For a new agentic system without annotation history yet:
+
+| Signal | Initial Filter |
+|---|---|
+| Errors | any tool error |
+| Cost | tokens > p95 |
+| Length | span count > p95 |
+| Recovery | retry_count > 0 |
+| Novelty | unseen tool chain |
+| Feedback | thumbs down |
+| Retrieval | similarity < threshold |
+| Regression | changed prompt/model version |
+
+Start with these eight. Add taxonomy classification once enough traces are collected
+to identify meaningful clusters. Migrate to full priority scoring in Phase 2.
+
+---
+
+## Maturity Phases
+
+| Phase | Sampling maturity |
+|---|---|
+| Phase 1 (MVP) | Failure + cost + random; independent pools; manual budget cap |
+| Phase 2 | Taxonomy classification; per-bucket quotas; retrieval failure + recovery signals |
+| Phase 3 | Full priority scoring pipeline; active learning; drift-triggered resampling; judge disagreement |
 
 ---
 
@@ -305,6 +501,29 @@ class SliceRule(BaseModel):
 Span extraction requires per-datasource implementation work and a separate API call
 pattern. Import modal UI also needs a second configuration block. Scoped out of v1
 to avoid blocking sampling delivery.
+
+---
+
+## Follow-on: v2 signals
+
+These signals are architecturally sound but require data that is not yet available
+in the import pipeline (human annotation history, embedding index, multi-judge setup):
+
+**Retrieval Failure** — `avg_chunk_similarity < threshold`, `response_claims_without_sources`,
+`retrieved_chunks_not_referenced`. Needs retrieval metadata in trace.
+
+**Recovery Behavior** — `retry_count > 0 AND final_success == true`. Excellent training
+material — the system recovered from a failure. Needs `retry_count` and `final_success` fields.
+
+**Judge Disagreement** — `abs(human_score - llm_score) > threshold`. Highest annotation
+value: cases where the automated judge is least reliable. Requires prior annotation history.
+
+**Drift Detection** — `current_intent_distribution != baseline_distribution`,
+embedding centroid shift, new languages or seasonal behavior. Needs embedding index.
+
+**Active Learning (Composite)** — `priority = uncertainty × w1 + novelty × w2 + business_impact × w3`.
+Select top-N traces per time window by composite score. The full priority scoring
+pipeline described above; target for Phase 3.
 
 ---
 
