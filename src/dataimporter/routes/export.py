@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 
 import httpx
-from arq.jobs import Job, JobStatus
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -199,6 +198,7 @@ async def get_export_status(
     job_id: str,
     auth: AuthContext = Depends(get_auth),
 ) -> dict:
+    from arq.jobs import Job, JobStatus
     pool = await get_pool()
     job = Job(job_id, pool)
 

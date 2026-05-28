@@ -21,6 +21,7 @@ if __name__ == "__main__":
         host=settings.server.host,
         port=settings.server.port,
         timeout_keep_alive=settings.server.timeout_keep_alive,
+        timeout_worker_healthcheck=settings.server.timeout_worker_healthcheck,
         reload=settings.server.debug,
         log_level="debug" if settings.server.debug else "info",
     )

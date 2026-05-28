@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
-from arq import ArqRedis, create_pool
-from arq.connections import RedisSettings
+from typing import TYPE_CHECKING
 
 from dataimporter.config import get_settings
+
+if TYPE_CHECKING:
+    from arq import ArqRedis
 
 _pool: ArqRedis | None = None
 
@@ -19,6 +21,8 @@ def is_queue_available() -> bool:
 async def get_pool() -> ArqRedis:
     global _pool
     if _pool is None:
+        from arq import create_pool
+        from arq.connections import RedisSettings
         url = get_settings().server.redis_url
         _pool = await create_pool(RedisSettings.from_dsn(url))
     return _pool

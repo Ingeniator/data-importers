@@ -185,7 +185,116 @@
                      padding: 1px 5px; border-radius: 3px; flex-shrink: 0; }
   .col-picker-ex   { font-size: .72rem; color: #9ca3af; max-width: 120px;
                      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
+
+  /* Column sort + filter in table headers */
+  th { vertical-align: top; }
+  .col-header { display: flex; flex-direction: column; gap: 3px; min-width: 70px; }
+  .col-sort { background: none; border: none; padding: 0; cursor: pointer; font-weight: 600;
+              font-size: .85rem; color: #374151; display: flex; align-items: center; gap: 4px;
+              white-space: nowrap; text-align: left; font-family: inherit; }
+  .col-sort:hover { color: #2563eb; }
+  .sort-icon { font-size: .68rem; color: #d1d5db; transition: color .1s; }
+  .sort-icon.asc, .sort-icon.desc { color: #2563eb; }
+  /* Backend filter rule builder */
+  .filter-rule { display: flex; align-items: center; gap: 8px; padding: 5px 8px; background: #fff;
+                 border: 1px solid #e5e7eb; border-radius: 5px; margin-bottom: 6px; font-size: .83rem; flex-wrap: wrap; }
+  .filter-rule-field { font-family: monospace; font-size: .8rem; color: #1e293b; font-weight: 600; }
+  .filter-rule-op { color: #6b7280; font-size: .78rem; padding: 1px 6px;
+                    background: #f3f4f6; border-radius: 3px; white-space: nowrap; }
+  .filter-rule-value { font-family: monospace; font-size: .78rem; color: #374151;
+                       max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .filter-rule-remove { background: none; border: none; cursor: pointer; color: #9ca3af;
+                         font-size: 1rem; padding: 0 2px; margin-left: auto; }
+  .filter-rule-remove:hover { color: #dc2626; }
+  .filter-add-row { display: flex; gap: 6px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+  .filter-add-row select, .filter-add-row input[type=text] {
+    padding: 5px 7px; font-size: .82rem; border: 1px solid #ddd; border-radius: 4px; background: #fff; }
+  .filter-add-row select { min-width: 90px; }
+  .filter-add-row input[type=text] { flex: 1; min-width: 80px; }
+  .filter-badge { display: inline-block; background: #dbeafe; color: #1e40af; border-radius: 10px;
+                  font-size: .7rem; font-weight: 700; padding: 1px 6px; margin-left: 4px; }
+
+  /* Compact search row (time group + search on one line) */
+  .search-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+  .time-group { display: flex; flex-direction: column; gap: 4px; flex-shrink: 0; }
+  .time-group-header { display: flex; align-items: center; gap: 6px; }
+  .time-field-sel { padding: 3px 7px; font-size: .78rem; border: 1px solid #ddd; border-radius: 4px;
+                    color: #555; max-width: 160px; background: #fff; }
+  .search-group { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 4px; }
+  .search-group label { display: flex; align-items: center; gap: 6px; margin: 0; }
+  .search-badge { font-size: .72rem; font-weight: 400; color: #6b7280; background: #f3f4f6;
+                  border-radius: 3px; padding: 1px 6px; white-space: nowrap; }
+  #timePickerWrap.time-off { opacity: .45; pointer-events: none; }
+
+  /* ── Export modal ── */
+  .export-dest-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:10px 0 4px; }
+  .export-dest-card { border:2px solid #e5e7eb; border-radius:8px; padding:14px 12px; cursor:pointer; text-align:center; transition:border-color .15s,background .15s; user-select:none; }
+  .export-dest-card:hover  { border-color:#93c5fd; background:#f0f9ff; }
+  .export-dest-card.selected { border-color:#2563eb; background:#eff6ff; }
+  .export-dest-card.disabled { opacity:.4; pointer-events:none; }
+  .dest-icon  { font-size:1.6rem; margin-bottom:5px; }
+  .dest-label { font-weight:600; font-size:.9rem; }
+  .dest-desc  { font-size:.75rem; color:#6b7280; margin-top:3px; }
+  .export-fmt-list  { display:flex; flex-direction:column; gap:7px; margin:10px 0 4px; }
+  .export-fmt-opt   { display:flex; align-items:flex-start; gap:10px; border:1.5px solid #e5e7eb; border-radius:6px; padding:9px 12px; cursor:pointer; user-select:none; }
+  .export-fmt-opt:hover { border-color:#93c5fd; }
+  .export-fmt-opt.selected { border-color:#2563eb; background:#eff6ff; }
+  .export-fmt-opt input[type=radio] { margin-top:3px; flex-shrink:0; cursor:pointer; accent-color:#2563eb; }
+  .fo-label { font-weight:600; font-size:.87rem; }
+  .fo-desc  { font-size:.75rem; color:#6b7280; margin-top:2px; }
+  .export-section-label { font-size:.8rem; font-weight:700; color:#374151; text-transform:uppercase; letter-spacing:.04em; margin:14px 0 4px; }
+  .export-step-hdr { font-size:.75rem; color:#9ca3af; float:right; }
+
+  /* Export panel options */
+  .export-options { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+  .export-opt-label { display:flex; align-items:flex-start; gap:9px; font-size:.85rem; font-weight:400; cursor:pointer; }
+  .export-opt-label input[type=checkbox] { margin-top:2px; flex-shrink:0; accent-color:#2563eb; cursor:pointer; }
+  .export-opt-text { display:flex; flex-direction:column; gap:1px; }
+  .export-opt-title { font-weight:600; font-size:.85rem; color:#374151; }
+  .export-opt-desc  { font-size:.75rem; color:#6b7280; }
+
+  /* Filter mode toggle */
+  .filter-mode-toggle { display:flex; gap:4px; margin-left:auto; }
+  .filter-mode-btn { padding:2px 10px; border:1px solid #d1d5db; border-radius:4px; font-size:.75rem; cursor:pointer; background:#fff; color:#555; }
+  .filter-mode-btn.active { background:#2563eb; color:#fff; border-color:#2563eb; }
+
+  /* Mask rules */
+  .mask-rules-section { margin-top:10px; padding-top:10px; border-top:1px solid #f3f4f6; }
+  .mask-rule { display:flex; align-items:center; gap:6px; margin-bottom:5px; font-size:.82rem; background:#f9fafb; border-radius:4px; padding:4px 8px; }
+  .mask-rule-field { flex:1; color:#374151; font-family:monospace; font-size:.8rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .mask-rule-action { color:#6b7280; font-size:.78rem; }
+  .mask-rule-remove { background:none; border:none; color:#9ca3af; cursor:pointer; font-size:.85rem; padding:0 2px; }
+  .mask-rule-remove:hover { color:#dc2626; }
+  .mask-add-row { display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .mask-add-row input, .mask-add-row select { padding:5px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:.82rem; }
+  .mask-add-row input { flex:1; min-width:120px; }
+
+  /* Asset resolution panel */
+  .asset-panel { margin:8px 0 0 24px; padding:10px; background:#f9fafb; border-radius:6px; border:1px solid #e5e7eb; font-size:.82rem; display:flex; flex-direction:column; gap:8px; }
+  .asset-panel label { font-weight:600; margin-bottom:2px; font-size:.8rem; }
+  .asset-panel input[type=text], .asset-panel select { width:100%; padding:5px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:.82rem; }
+  .asset-panel .hint { font-size:.75rem; color:#9ca3af; margin-top:2px; }
+  .asset-tag-list { display:flex; flex-wrap:wrap; gap:4px; margin-top:4px; }
+  .asset-tag { background:#e0e7ff; color:#3730a3; border-radius:3px; padding:2px 7px; font-size:.75rem; display:flex; align-items:center; gap:4px; }
+  .asset-tag button { background:none; border:none; cursor:pointer; color:#6366f1; font-size:.75rem; padding:0; }
+
+  /* Destination / webhook / schedule sections */
+  .cfg-section { margin-top:10px; border-top:1px solid #f3f4f6; padding-top:10px; }
+  .cfg-section-title { font-size:.8rem; font-weight:700; color:#374151; text-transform:uppercase; letter-spacing:.04em; margin-bottom:8px; }
+  .cfg-field { margin-bottom:8px; }
+  .cfg-field label { font-size:.8rem; font-weight:600; color:#374151; margin-bottom:3px; display:block; }
+  .cfg-field input[type=text], .cfg-field input[type=number], .cfg-field select { width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:.82rem; }
+  .cfg-field .hint { font-size:.73rem; color:#9ca3af; margin-top:2px; }
+  .cfg-toggle { display:flex; align-items:center; gap:6px; font-size:.82rem; }
+  .cfg-toggle input { accent-color:#2563eb; }
+  .kv-pair { display:flex; gap:6px; margin-bottom:5px; }
+  .kv-pair input { flex:1; padding:5px 8px; border:1px solid #d1d5db; border-radius:4px; font-size:.82rem; }
+  .kv-pair button { background:none; border:none; cursor:pointer; color:#9ca3af; font-size:.85rem; }
+  .kv-pair button:hover { color:#dc2626; }
+  .add-kv-btn { font-size:.78rem; color:#2563eb; background:none; border:none; cursor:pointer; padding:0; margin-top:2px; }
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" crossorigin="anonymous"></script>
 </head>
 <body>
 <h1>dataimporter</h1>
@@ -202,42 +311,86 @@
 
 <!-- Filters (shown when a datasource is selected) -->
 <div class="card" id="filtersCard" style="display:none">
-  <div class="row" style="align-items:flex-end">
-    <div>
-      <label>Time Range</label>
-      <div class="time-picker" id="timePicker">
-        <button type="button" class="time-btn" onclick="toggleTimeDropdown()">
-          <span id="timeLabel">Last 24 hours</span>
-          <span class="arrow">&#9660;</span>
-        </button>
-        <div class="time-dropdown" id="timeDropdown">
-          <div class="time-presets" id="timePresets">
-            <div onclick="setPreset('15m','Last 15 minutes')">Last 15 minutes</div>
-            <div onclick="setPreset('1h','Last 1 hour')">Last 1 hour</div>
-            <div onclick="setPreset('4h','Last 4 hours')">Last 4 hours</div>
-            <div class="active" onclick="setPreset('24h','Last 24 hours')">Last 24 hours</div>
-            <div onclick="setPreset('7d','Last 7 days')">Last 7 days</div>
-            <div onclick="setPreset('30d','Last 30 days')">Last 30 days</div>
-            <div onclick="setPreset('all','All time')">All time</div>
-          </div>
-          <div class="time-custom">
-            <label>From</label>
-            <input type="datetime-local" id="time_from">
-            <label>To</label>
-            <input type="datetime-local" id="time_to">
-            <button class="btn-primary btn-sm" onclick="applyCustomRange()">Apply</button>
+  <div class="search-row">
+    <!-- Time group: field selector + range picker on one line -->
+    <div class="time-group">
+      <div class="time-group-header">
+        <label style="margin:0">Range</label>
+        <select id="timeFieldSel" class="time-field-sel" title="Field used for time filtering"
+                onchange="setTimeField(this.value)" style="display:none">
+          <option value="">— off —</option>
+        </select>
+      </div>
+      <div id="timePickerWrap">
+        <div class="time-picker" id="timePicker">
+          <button type="button" class="time-btn" onclick="toggleTimeDropdown()">
+            <span id="timeLabel">Last 24 hours</span>
+            <span class="arrow">&#9660;</span>
+          </button>
+          <div class="time-dropdown" id="timeDropdown">
+            <div class="time-presets" id="timePresets">
+              <div onclick="setPreset('15m','Last 15 minutes')">Last 15 minutes</div>
+              <div onclick="setPreset('1h','Last 1 hour')">Last 1 hour</div>
+              <div onclick="setPreset('4h','Last 4 hours')">Last 4 hours</div>
+              <div class="active" onclick="setPreset('24h','Last 24 hours')">Last 24 hours</div>
+              <div onclick="setPreset('7d','Last 7 days')">Last 7 days</div>
+              <div onclick="setPreset('30d','Last 30 days')">Last 30 days</div>
+              <div onclick="setPreset('all','All time')">All time</div>
+            </div>
+            <div class="time-custom">
+              <label>From</label>
+              <input type="datetime-local" id="time_from">
+              <label>To</label>
+              <input type="datetime-local" id="time_to">
+              <button class="btn-primary btn-sm" onclick="applyCustomRange()">Apply</button>
+            </div>
           </div>
         </div>
       </div>
     </div>
-    <div><label>Session ID</label><input type="text" id="f_session"></div>
-    <div><label>Trace ID</label><input type="text" id="f_trace"></div>
-    <div id="filterTraceType"><label>Trace Type</label><input type="text" id="f_tracetype"></div>
-    <div id="filterInputHash"><label>Input Hash</label><input type="text" id="f_hash"></div>
+    <!-- Search input with info badge -->
+    <div class="search-group">
+      <label>Search <span id="searchInfoBadge" class="search-badge" style="display:none"></span></label>
+      <input type="text" id="f_query" placeholder="Search inside content...">
+    </div>
   </div>
-  <div class="row" style="margin-top:8px">
-    <div style="flex:3"><label>Search</label><input type="text" id="f_query" placeholder="Search inside log content..."></div>
+
+  <!-- Backend filter builder (hidden for S3 file-list mode) -->
+  <div id="filterToggleArea" style="display:none">
+    <div class="samp-toggle" style="align-items:center">
+      <button type="button" id="filter_toggle_btn" onclick="toggleFilters()">⚗ Add filters ▼</button>
+      <div class="filter-mode-toggle" id="filter_mode_toggle" style="display:none">
+        <button class="filter-mode-btn active" id="fm_and" onclick="_setFilterMode('and')">AND</button>
+        <button class="filter-mode-btn" id="fm_or" onclick="_setFilterMode('or')">OR</button>
+      </div>
+    </div>
+    <div id="filter_panel" class="samp-panel" style="display:none">
+      <div id="filter_rules"></div>
+      <div class="filter-add-row">
+        <select id="filter_field_sel" style="flex:2;min-width:120px">
+          <option value="">— field —</option>
+        </select>
+        <select id="filter_op_sel" onchange="_onFilterOpChange(this)">
+          <option value="contains">contains</option>
+          <option value="eq">equals</option>
+          <option value="neq">not equals</option>
+          <option value="not_contains">not contains</option>
+          <option value="starts_with">starts with</option>
+          <option value="in">in</option>
+          <option value="not_in">not in</option>
+          <option value="gt">&gt;</option>
+          <option value="lt">&lt;</option>
+          <option value="gte">&gt;=</option>
+          <option value="lte">&lt;=</option>
+          <option value="is_null">is empty</option>
+          <option value="not_null">not empty</option>
+        </select>
+        <input type="text" id="filter_val_inp" placeholder="value…">
+        <button class="btn-secondary btn-sm" onclick="addFilterRule()">+ Add</button>
+      </div>
+    </div>
   </div>
+
   <div class="actions" id="actionButtons"></div>
 </div>
 
@@ -253,6 +406,167 @@
   </table>
   <div class="actions" id="resultActions"></div>
   <div id="urls"></div>
+</div>
+
+<!-- Export panel — always visible when a datasource is selected -->
+<div class="card" id="exportCard" style="display:none">
+  <div class="samp-toggle" style="margin-top:0">
+    <button type="button" id="samp_btn" onclick="toggleSampling()">⚗ Sampling ▼</button>
+  </div>
+  <div id="samp_panel" class="samp-panel" style="display:none;margin-top:10px">
+    <div id="samp_schema_area"><span style="color:#aaa;font-size:.78rem">Click to load schema</span></div>
+    <div id="samp_options" style="display:none">
+      <label class="samp-strict"><input type="checkbox" id="samp_strict"> Ignore traces with mismatched structure</label>
+      <div class="samp-max"><label>Max traces</label><input type="number" id="samp_max_traces" placeholder="no limit" min="1" style="width:100px"></div>
+      <div class="samp-rules" id="samp_rules"></div>
+      <div class="samp-add-row">
+        <select id="samp_strat_select"></select>
+        <button class="btn-secondary btn-sm" onclick="addSampRule()">+ Add strategy</button>
+      </div>
+      <div id="samp_yield" class="samp-yield" style="display:none"></div>
+    </div>
+  </div>
+  <div class="export-options">
+    <label class="export-opt-label">
+      <input type="checkbox" id="exp_col_mask" onchange="_expColMask=this.checked">
+      <div class="export-opt-text">
+        <span class="export-opt-title">Use column filter as dataset mask</span>
+        <span class="export-opt-desc">Export only the fields currently visible in the table (from the column picker)</span>
+      </div>
+    </label>
+    <!-- Masking rules builder -->
+    <div class="mask-rules-section" id="mask_rules_section">
+      <div style="font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Field masking rules</div>
+      <div id="mask_rules"></div>
+      <div class="mask-add-row">
+        <input type="text" id="mask_field_inp" placeholder="field.path">
+        <select id="mask_action_sel" onchange="_onMaskActionChange(this)">
+          <option value="remove">remove</option>
+          <option value="hash">hash</option>
+          <option value="redact">redact</option>
+          <option value="truncate">truncate</option>
+          <option value="keep">keep</option>
+        </select>
+        <input type="number" id="mask_maxlen_inp" placeholder="max len" min="1" style="width:80px;display:none">
+        <button class="btn-secondary btn-sm" onclick="addMaskRule()">+ Add</button>
+      </div>
+    </div>
+
+    <label class="export-opt-label">
+      <input type="checkbox" id="exp_asset_resolve" onchange="_expAssetResolve=this.checked;_toggleAssetPanel(this.checked)">
+      <div class="export-opt-text">
+        <span class="export-opt-title">Enable asset resolution</span>
+        <span class="export-opt-desc">Find any referenced assets (images, files, URLs) and export them as a separate dataset</span>
+      </div>
+    </label>
+    <!-- Asset resolution expanded options -->
+    <div id="asset_panel" class="asset-panel" style="display:none">
+      <div>
+        <label>Source fields <span class="hint">(dot-notation paths that hold asset references)</span></label>
+        <div class="asset-tag-list" id="asset_sources_list"></div>
+        <div style="display:flex;gap:6px;margin-top:4px">
+          <input type="text" id="asset_src_inp" placeholder="e.g. trace.attachments" style="flex:1;padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem">
+          <button class="btn-secondary btn-sm" onclick="_addAssetSource()">+ Add</button>
+        </div>
+      </div>
+      <div>
+        <label>Fetch mode</label>
+        <select id="asset_fetch_mode" onchange="_assetFetchMode=this.value" style="width:100%;padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem">
+          <option value="metadata_only">metadata_only — record URL/size/mime only</option>
+          <option value="full">full — download content into export</option>
+        </select>
+      </div>
+      <div class="cfg-toggle">
+        <input type="checkbox" id="asset_check_avail" onchange="_assetCheckAvail=this.checked">
+        <label for="asset_check_avail" style="font-weight:400">HEAD-check each asset URL before including it</label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Destination -->
+  <div class="cfg-section" id="dest_section">
+    <div class="cfg-section-title">Destination</div>
+    <div class="cfg-field">
+      <label>Target</label>
+      <select id="dest_target" onchange="_destTarget=this.value">
+        <option value="">— select target —</option>
+      </select>
+    </div>
+    <div class="cfg-field">
+      <label>Dataset name</label>
+      <input type="text" id="dest_dataset_name" placeholder="my-export-2024" oninput="_destDatasetName=this.value">
+    </div>
+    <div style="display:flex;gap:10px">
+      <div class="cfg-field" style="flex:1">
+        <label>Access</label>
+        <select id="dest_access" onchange="_destAccess=this.value">
+          <option value="organization">organization</option>
+          <option value="private">private</option>
+        </select>
+      </div>
+      <div class="cfg-field" style="flex:1">
+        <label>Dataset type</label>
+        <select id="dest_dataset_type" onchange="_destDatasetType=this.value">
+          <option value="DATASET">DATASET</option>
+          <option value="EXPERIMENT">EXPERIMENT</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Webhook -->
+  <div class="cfg-section">
+    <div class="cfg-section-title">Webhook <span style="font-size:.72rem;font-weight:400;color:#9ca3af;text-transform:none;letter-spacing:0">— notified on job completion</span></div>
+    <div class="cfg-field">
+      <label>URL</label>
+      <input type="text" id="webhook_url" placeholder="https://example.com/hooks/done" oninput="_webhookUrl=this.value">
+    </div>
+    <div class="cfg-field">
+      <label>Headers <span class="hint">(key: value, one per line)</span></label>
+      <textarea id="webhook_headers" rows="2" oninput="_webhookHeadersRaw=this.value"
+        style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem;font-family:monospace;resize:vertical"
+        placeholder="Authorization: Bearer token"></textarea>
+    </div>
+    <div style="display:flex;gap:10px">
+      <div class="cfg-field" style="flex:1">
+        <label>Secret <span class="hint">(HMAC signing)</span></label>
+        <input type="text" id="webhook_secret" placeholder="optional" oninput="_webhookSecret=this.value">
+      </div>
+      <div class="cfg-field" style="width:110px">
+        <label>Timeout (s)</label>
+        <input type="number" id="webhook_timeout" value="30" min="1" max="300" oninput="_webhookTimeout=parseInt(this.value)||30">
+      </div>
+    </div>
+  </div>
+
+  <!-- Schedule -->
+  <div class="cfg-section">
+    <div class="cfg-section-title">Schedule</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <div class="cfg-field" style="flex:2;min-width:150px">
+        <label>Cron expression</label>
+        <input type="text" id="schedule_cron" placeholder="0 9 * * 1" oninput="_scheduleCron=this.value">
+        <div class="hint">minute hour day month weekday</div>
+      </div>
+      <div class="cfg-field" style="flex:1;min-width:130px">
+        <label>Timezone</label>
+        <input type="text" id="schedule_tz" placeholder="UTC" value="UTC" oninput="_scheduleTz=this.value">
+      </div>
+    </div>
+    <div class="cfg-toggle">
+      <input type="checkbox" id="schedule_enabled" checked onchange="_scheduleEnabled=this.checked">
+      <label for="schedule_enabled" style="font-weight:400">Enabled</label>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="btn-secondary btn-sm" onclick="downloadConfigYaml()" title="Download current configuration as YAML">⬇ Config YAML</button>
+    <label class="btn-secondary btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center" title="Upload a saved configuration YAML">
+      ⬆ Config YAML
+      <input type="file" id="yamlFileInput" accept=".yaml,.yml" style="display:none" onchange="_onYamlFileSelected(this)">
+    </label>
+    <button class="btn-primary" onclick="showExportModal(_sampMode)">Export ▼</button>
+  </div>
 </div>
 
 <div id="modal"></div>
@@ -274,6 +588,18 @@ let _schemaCache = {};      // dsName → { fields, defaultColumns, visibleColum
 let _schemaDetecting = {};  // dsName → true (dedup guard)
 let _colPickerOpen = false;
 const LS_COLS_KEY = 'dataimporter_columns_v1';
+
+// ── Client-side sort state ──
+let _sortCol = null;
+let _sortDir = 'asc';   // 'asc' | 'desc'
+
+// ── Backend filter rules ──
+let _filterRules = [];  // [{ field, op, value }]
+let _filtersOpen = false;
+
+// ── Time field ──
+// null = not yet determined (schema pending); '' = off; 'fieldname' = use this column
+let _timeField = null;
 
 const PRESETS = {
   '15m': 15*60*1000, '1h': 60*60*1000, '4h': 4*60*60*1000,
@@ -310,6 +636,7 @@ function applyCustomRange() {
   document.getElementById('timeDropdown').classList.remove('open');
 }
 function getTimeRange() {
+  if (_timeField === '') return {};  // time field disabled → no time filtering
   if (customFrom && customTo) return { start: customFrom, end: customTo };
   const ms = PRESETS[timePreset]; if (!ms) return {};
   const now = new Date();
@@ -422,6 +749,72 @@ function _deriveSchemaFromRecords(records) {
 }
 
 // ══════════════════════════════════════════
+//  Time field detection + UI
+// ══════════════════════════════════════════
+
+const _TS_RE = /^(timestamp|time|ts|created_at|created|date|datetime|at|event_time|start_time|end_time|updated_at|logged_at)$/i;
+
+/** Return the best timestamp-looking leaf field, or null if none found. */
+function _findTimeField(fields) {
+  const leaves = _leafFields(fields);
+  // Prefer top-level (no dot) fields whose name matches the timestamp regex
+  const top = leaves.filter(k => !k.includes('.') && _TS_RE.test(k));
+  if (top.length) return top[0];
+  // Fall back to dotted paths whose last segment looks like a timestamp
+  const nested = leaves.filter(k => _TS_RE.test(k.split('.').pop()));
+  if (nested.length) return nested[0];
+  return null;
+}
+
+/** Populate the time field selector and enable/disable the time range picker. */
+function _updateTimeFieldUI() {
+  const sel  = document.getElementById('timeFieldSel');
+  const wrap = document.getElementById('timePickerWrap');
+  if (!sel || !wrap) return;
+
+  const schema = activeDs && _schemaCache[activeDs.name];
+  if (!schema) {
+    sel.style.display = 'none';
+    wrap.classList.remove('time-off');
+    return;
+  }
+
+  const leaves = _leafFields(schema.fields);
+  const tsFields    = leaves.filter(k => _TS_RE.test(k.split('.').pop()));
+  const otherFields = leaves.filter(k => !_TS_RE.test(k.split('.').pop()));
+
+  let html = '<option value="">— off —</option>';
+  if (tsFields.length) {
+    html += '<optgroup label="Timestamp fields">' +
+      tsFields.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('') +
+      '</optgroup>';
+  }
+  if (otherFields.length) {
+    html += '<optgroup label="Other fields">' +
+      otherFields.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('') +
+      '</optgroup>';
+  }
+  sel.innerHTML = html;
+
+  // Auto-select on first schema load for this datasource (_timeField === null)
+  if (_timeField === null) {
+    const detected = _findTimeField(schema.fields);
+    _timeField = (detected !== null) ? detected : '';
+  }
+
+  sel.value = _timeField;
+  sel.style.display = '';
+  wrap.classList.toggle('time-off', _timeField === '');
+}
+
+/** Called when user changes the time field selector. */
+function setTimeField(value) {
+  _timeField = value;
+  const wrap = document.getElementById('timePickerWrap');
+  if (wrap) wrap.classList.toggle('time-off', value === '');
+}
+
+// ══════════════════════════════════════════
 //  Schema detection (hybrid: fires on tab select)
 // ══════════════════════════════════════════
 
@@ -476,9 +869,11 @@ async function _detectSchema(ds, force = false) {
 
     _storeSchema(name, fields);
     _setSchemaBarStatus('ready');
+    _updateTimeFieldUI();
 
     // If search results are already on screen, re-render with proper schema
-    if (currentEvents.length) renderDynamicTable(currentEvents);
+    // keepState=true so sort/filter the user already applied is preserved
+    if (currentEvents.length) renderDynamicTable(currentEvents, true);
 
   } catch (e) {
     if (!activeDs || activeDs.name !== name) return;
@@ -594,18 +989,21 @@ function toggleColumn(field, checked) {
   } else {
     schema.visibleColumns = schema.visibleColumns.filter(f => f !== field);
   }
+  // Clear sort for a column being hidden
+  if (!checked && _sortCol === field) { _sortCol = null; _sortDir = 'asc'; }
   _saveColumns(activeDs.name, schema.visibleColumns);
   _renderColumnPicker();  // refresh checkbox counts
-  if (currentEvents.length) renderDynamicTable(currentEvents);
+  if (currentEvents.length) renderDynamicTable(currentEvents, true);
 }
 
 function resetToDefaultColumns() {
   const schema = activeDs && _schemaCache[activeDs.name];
   if (!schema) return;
   schema.visibleColumns = [...schema.defaultColumns];
+  if (_sortCol && !schema.visibleColumns.includes(_sortCol)) { _sortCol = null; _sortDir = 'asc'; }
   _saveColumns(activeDs.name, schema.visibleColumns);
   _renderColumnPicker();
-  if (currentEvents.length) renderDynamicTable(currentEvents);
+  if (currentEvents.length) renderDynamicTable(currentEvents, true);
 }
 
 // ══════════════════════════════════════════
@@ -632,62 +1030,309 @@ function _renderCellValue(v) {
   return esc(s.length > 80 ? s.substring(0, 78) + '…' : s);
 }
 
-function renderDynamicTable(records) {
+// ══════════════════════════════════════════
+//  Client-side sort (backend handles filtering)
+// ══════════════════════════════════════════
+
+function setSortCol(col) {
+  _sortDir = (_sortCol === col && _sortDir === 'asc') ? 'desc' : 'asc';
+  _sortCol = col;
+  _updateSortIndicators();
+  _renderTableBody(_sortedEvents());
+}
+
+function _sortedEvents() {
+  if (!_sortCol) return [...currentEvents];
+  return [...currentEvents].sort((a, b) => {
+    const av = _getNestedValue(a, _sortCol);
+    const bv = _getNestedValue(b, _sortCol);
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    const as = typeof av === 'object' ? JSON.stringify(av) : String(av);
+    const bs = typeof bv === 'object' ? JSON.stringify(bv) : String(bv);
+    const cmp = as < bs ? -1 : as > bs ? 1 : 0;
+    return _sortDir === 'asc' ? cmp : -cmp;
+  });
+}
+
+function _updateSortIndicators() {
+  document.querySelectorAll('.sort-icon').forEach(el => {
+    const btn = el.closest('[data-col]');
+    const col = btn && btn.dataset.col;
+    if (col === _sortCol) {
+      el.textContent = _sortDir === 'asc' ? '↑' : '↓';
+      el.className = 'sort-icon ' + _sortDir;
+    } else {
+      el.textContent = '⇅';
+      el.className = 'sort-icon';
+    }
+  });
+}
+
+/** Re-render only tbody — preserves thead and sort state. */
+function _renderTableBody(rows) {
+  const schema = activeDs && _schemaCache[activeDs.name];
+  const cols = schema && schema.visibleColumns && schema.visibleColumns.length
+    ? schema.visibleColumns : [];
+  const tbody = document.getElementById('tbody');
+  if (!tbody || !cols.length) return;
+
+  tbody.innerHTML = '';
+  document.getElementById('results').style.display = rows.length ? '' : 'none';
+
+  rows.forEach((ev, i) => {
+    const cells = cols.map(c => {
+      const v = _getNestedValue(ev, c);
+      const raw = v != null ? (typeof v === 'object' ? JSON.stringify(v) : String(v)) : '';
+      return '<td class="truncate" title="' + esc(raw.substring(0, 300)) + '">' + _renderCellValue(v) + '</td>';
+    }).join('');
+    const origIdx = currentEvents.indexOf(ev);
+    const idx = origIdx >= 0 ? origIdx : i;
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="checkbox" class="sel" data-idx="' + idx + '"></td>' +
+      cells +
+      '<td><button class="btn-secondary btn-sm" onclick="previewEvent(' + idx + ')">Preview</button></td>';
+    tbody.appendChild(tr);
+  });
+}
+
+// ══════════════════════════════════════════
+//  Backend filter rule builder
+// ══════════════════════════════════════════
+
+const FILTER_OP_LABELS = {
+  contains: 'contains', not_contains: 'not contains', eq: 'equals', neq: 'not equals',
+  starts_with: 'starts with', in: 'in', not_in: 'not in',
+  gt: '>', lt: '<', gte: '>=', lte: '<=',
+  is_null: 'is empty', not_null: 'not empty',
+};
+
+function toggleFilters() {
+  _filtersOpen = !_filtersOpen;
+  document.getElementById('filter_panel').style.display = _filtersOpen ? '' : 'none';
+  _updateFilterToggleBtn();
+  _updateFilterModeUI();
+  if (_filtersOpen) {
+    _refreshFilterFieldSelect();
+    _renderFilterRules();
+  }
+}
+
+function _updateFilterToggleBtn() {
+  const btn = document.getElementById('filter_toggle_btn');
+  if (!btn) return;
+  const n = _filterRules.length;
+  const badge = n ? '<span class="filter-badge">' + n + '</span>' : '';
+  btn.innerHTML = '⚗ Filters' + badge + (_filtersOpen ? ' ▲' : ' ▼');
+  btn.classList.toggle('active', _filtersOpen || n > 0);
+}
+
+function _setFilterMode(mode) {
+  _filterMode = mode;
+  _updateFilterModeUI();
+}
+
+function _updateFilterModeUI() {
+  const toggle = document.getElementById('filter_mode_toggle');
+  if (toggle) toggle.style.display = (_filtersOpen || _filterRules.length > 1) ? '' : 'none';
+  const andBtn = document.getElementById('fm_and');
+  const orBtn  = document.getElementById('fm_or');
+  if (andBtn) andBtn.classList.toggle('active', _filterMode === 'and');
+  if (orBtn)  orBtn.classList.toggle('active', _filterMode === 'or');
+}
+
+function _onFilterOpChange(sel) {
+  const inp = document.getElementById('filter_val_inp');
+  if (!inp) return;
+  if (sel.value === 'in' || sel.value === 'not_in') {
+    inp.placeholder = 'val1, val2, …';
+  } else if (sel.value === 'is_null' || sel.value === 'not_null') {
+    inp.placeholder = '';
+  } else {
+    inp.placeholder = 'value…';
+  }
+}
+
+// ── Masking rules ────────────────────────────────────────────────────────────
+function _onMaskActionChange(sel) {
+  const ml = document.getElementById('mask_maxlen_inp');
+  if (ml) ml.style.display = sel.value === 'truncate' ? '' : 'none';
+}
+
+function addMaskRule() {
+  const field  = (document.getElementById('mask_field_inp').value || '').trim();
+  const action = document.getElementById('mask_action_sel').value;
+  const maxLen = action === 'truncate' ? parseInt(document.getElementById('mask_maxlen_inp').value) || null : null;
+  if (!field) return;
+  _maskRules.push({ field, action, max_length: maxLen });
+  document.getElementById('mask_field_inp').value = '';
+  _renderMaskRules();
+}
+
+function removeMaskRule(i) {
+  _maskRules.splice(i, 1);
+  _renderMaskRules();
+}
+
+function _renderMaskRules() {
+  const el = document.getElementById('mask_rules');
+  if (!el) return;
+  if (!_maskRules.length) {
+    el.innerHTML = '<div style="font-size:.78rem;color:#aaa;padding:2px 0 6px">No masking rules.</div>';
+    return;
+  }
+  el.innerHTML = _maskRules.map((r, i) =>
+    '<div class="mask-rule">' +
+      '<span class="mask-rule-field">' + esc(r.field) + '</span>' +
+      '<span class="mask-rule-action">' + esc(r.action) + (r.max_length ? ' (' + r.max_length + ')' : '') + '</span>' +
+      '<button class="mask-rule-remove" onclick="removeMaskRule(' + i + ')" title="Remove">✕</button>' +
+    '</div>'
+  ).join('');
+}
+
+// ── Asset resolution panel ───────────────────────────────────────────────────
+function _toggleAssetPanel(show) {
+  const p = document.getElementById('asset_panel');
+  if (p) p.style.display = show ? '' : 'none';
+  if (show) _renderAssetSources();
+}
+
+function _addAssetSource() {
+  const inp = document.getElementById('asset_src_inp');
+  const val = (inp && inp.value || '').trim();
+  if (!val || _assetSources.includes(val)) return;
+  _assetSources.push(val);
+  inp.value = '';
+  _renderAssetSources();
+}
+
+function _removeAssetSource(i) {
+  _assetSources.splice(i, 1);
+  _renderAssetSources();
+}
+
+function _renderAssetSources() {
+  const el = document.getElementById('asset_sources_list');
+  if (!el) return;
+  el.innerHTML = _assetSources.map((s, i) =>
+    '<span class="asset-tag">' + esc(s) +
+      '<button onclick="_removeAssetSource(' + i + ')" title="Remove">✕</button>' +
+    '</span>'
+  ).join('');
+}
+
+function _refreshFilterFieldSelect() {
+  const sel = document.getElementById('filter_field_sel');
+  if (!sel) return;
+  const schema = activeDs && _schemaCache[activeDs.name];
+  if (!schema) return;
+  const leaves = _leafFields(schema.fields);
+  sel.innerHTML = '<option value="">— field —</option>' +
+    leaves.map(f => '<option value="' + esc(f) + '">' + esc(f) + '</option>').join('');
+}
+
+function addFilterRule() {
+  const field = document.getElementById('filter_field_sel').value;
+  const op    = document.getElementById('filter_op_sel').value;
+  const value = document.getElementById('filter_val_inp').value.trim();
+  if (!field) return;
+  const needsValue = op !== 'is_null' && op !== 'not_null';
+  if (needsValue && !value) return;
+  _filterRules.push({ field, op, value: needsValue ? value : null });
+  document.getElementById('filter_val_inp').value = '';
+  _renderFilterRules();
+  _updateFilterToggleBtn();
+}
+
+function removeFilterRule(i) {
+  _filterRules.splice(i, 1);
+  _renderFilterRules();
+  _updateFilterToggleBtn();
+}
+
+function _renderFilterRules() {
+  const el = document.getElementById('filter_rules');
+  if (!el) return;
+  if (!_filterRules.length) {
+    el.innerHTML = '<div style="font-size:.8rem;color:#aaa;padding:4px 0 8px">No filters — all results shown.</div>';
+    return;
+  }
+  el.innerHTML = _filterRules.map((r, i) =>
+    '<div class="filter-rule">' +
+      '<span class="filter-rule-field">' + esc(r.field) + '</span>' +
+      '<span class="filter-rule-op">' + esc(FILTER_OP_LABELS[r.op] || r.op) + '</span>' +
+      (r.value != null ? '<span class="filter-rule-value">' + esc(r.value) + '</span>' : '') +
+      '<button class="filter-rule-remove" onclick="removeFilterRule(' + i + ')" title="Remove">✕</button>' +
+    '</div>'
+  ).join('');
+}
+
+/** Serialize active filter rules for the backend (JSON query param). */
+function _filtersParam() {
+  return _filterRules.length ? JSON.stringify(_filterRules) : null;
+}
+
+// ══════════════════════════════════════════
+//  Dynamic table renderer
+// ══════════════════════════════════════════
+
+/**
+ * Full table render — call for new search results.
+ * @param {object[]} records  Raw results from backend.
+ * @param {boolean}  keepState  When true, preserves current sort/filter (used by schema re-render).
+ */
+function renderDynamicTable(records, keepState = false) {
   const schema = activeDs && _schemaCache[activeDs.name];
   let cols;
 
   if (schema && schema.visibleColumns && schema.visibleColumns.length) {
     cols = schema.visibleColumns;
   } else {
-    // Schema not ready yet — derive client-side and store
+    // Schema not ready — derive client-side
     const derived = _deriveSchemaFromRecords(records);
     if (Object.keys(derived).length && activeDs) {
       _storeSchema(activeDs.name, derived);
       cols = _schemaCache[activeDs.name].visibleColumns;
       _setSchemaBarStatus('ready');
     } else {
-      // Last resort: top-level keys
       cols = Object.keys(records[0] || {}).filter(k => !k.startsWith('_')).slice(0, 6);
     }
   }
 
-  // Disambiguate header labels: if two columns share a last segment, show full path
+  // Reset sort on fresh search; keep it on schema-triggered re-render
+  if (!keepState) {
+    _sortCol = null;
+    _sortDir = 'asc';
+  }
+
+  // Disambiguate labels: show full path only when last segment is duplicated
   const lastSegs = cols.map(c => c.split('.').pop());
   const colHeaders = cols.map((c, i) => {
     const label = lastSegs.filter((s, j) => s === lastSegs[i] && j !== i).length > 0 ? c : lastSegs[i];
-    return '<th title="' + esc(c) + '" style="white-space:nowrap">' + esc(label) + '</th>';
+    const safeC = c.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    const sortIcon = (c === _sortCol)
+      ? '<span class="sort-icon ' + _sortDir + '">' + (_sortDir === 'asc' ? '↑' : '↓') + '</span>'
+      : '<span class="sort-icon">⇅</span>';
+    return '<th>' +
+      '<button class="col-sort" data-col="' + esc(c) + '" onclick="setSortCol(\'' + safeC + '\')" title="Sort by ' + esc(c) + '">' +
+        esc(label) + sortIcon +
+      '</button>' +
+    '</th>';
   }).join('');
 
   document.getElementById('thead').innerHTML =
-    '<tr><th><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>' +
-    colHeaders + '<th></th></tr>';
+    '<tr>' +
+      '<th><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>' +
+      colHeaders +
+      '<th></th>' +
+    '</tr>';
 
-  const tbody = document.getElementById('tbody');
-  tbody.innerHTML = '';
-  document.getElementById('results').style.display = records.length ? '' : 'none';
+  document.getElementById('results').style.display = '';
+  document.getElementById('resultActions').innerHTML = '';
 
-  const importBtnEv = targets.length
-    ? '<button class="btn-secondary" onclick="showImportModal(\'events\')">Import to dataset service</button>'
-    : '';
-  document.getElementById('resultActions').innerHTML =
-    '<button class="btn-primary" onclick="downloadEventsJson()">Download catalog</button>' +
-    '<button class="btn-secondary" onclick="downloadEventsJsonl()">Download JSONL</button>' +
-    '<button class="btn-secondary" onclick="exportEventsDataset()">Export as dataset</button>' +
-    importBtnEv;
-
-  records.forEach((ev, i) => {
-    const cells = cols.map(c => {
-      const v = _getNestedValue(ev, c);
-      const raw = (v != null && typeof v === 'object') ? JSON.stringify(v) : (v != null ? String(v) : '');
-      return '<td class="truncate" title="' + esc(raw.substring(0, 300)) + '">' + _renderCellValue(v) + '</td>';
-    }).join('');
-    const tr = document.createElement('tr');
-    tr.innerHTML =
-      '<td><input type="checkbox" class="sel" data-idx="' + i + '"></td>' +
-      cells +
-      '<td><button class="btn-secondary btn-sm" onclick="previewEvent(' + i + ')">Preview</button></td>';
-    tbody.appendChild(tr);
-  });
+  _renderTableBody(_sortedEvents());
 }
 
 // ── Auth ──
@@ -715,6 +1360,13 @@ async function init() {
       targets = cfg.targets || [];
     }
   } catch {}
+
+  // Populate destination target dropdown
+  const destSel = document.getElementById('dest_target');
+  if (destSel) {
+    destSel.innerHTML = '<option value="">— select target —</option>' +
+      targets.map(t => '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>').join('');
+  }
 
   renderTabs();
   const allTabs = getAllTabs();
@@ -949,21 +1601,74 @@ function selectDatasource(ds) {
   document.getElementById('urls').innerHTML = '';
   currentEvents = [];
   currentSearchKeys = [];
-  // Close column picker when switching tabs
+  // Close pickers, reset sort, filters, sampling and time field when switching tabs
   closeColumnPicker();
+  _sortCol = null; _sortDir = 'asc';
+  _filterRules = []; _filtersOpen = false;
+  _timeField = null;  // will be auto-detected when schema loads
+  const fp = document.getElementById('filter_panel');
+  if (fp) fp.style.display = 'none';
+  // Reset sampling state for the new datasource
+  _sampRules = []; _sampOpen = false; _sampSchema = {};
+  const sp = document.getElementById('samp_panel');
+  if (sp) sp.style.display = 'none';
+  const sb = document.getElementById('samp_btn');
+  if (sb) { sb.classList.remove('active'); sb.textContent = '⚗ Sampling ▼'; }
+  const so = document.getElementById('samp_options');
+  if (so) so.style.display = 'none';
+  const ssa = document.getElementById('samp_schema_area');
+  if (ssa) ssa.innerHTML = '<span style="color:#aaa;font-size:.78rem">Click to load schema</span>';
+  // Reset export options
+  _expColMask = false; _expAssetResolve = false;
+  _filterMode = 'and'; _maskRules = [];
+  _assetSources = []; _assetFetchMode = 'metadata_only'; _assetCheckAvail = false;
+  const ecm = document.getElementById('exp_col_mask'); if (ecm) ecm.checked = false;
+  const ear = document.getElementById('exp_asset_resolve'); if (ear) ear.checked = false;
+  _toggleAssetPanel(false);
+  _renderMaskRules();
+  _updateFilterModeUI();
+  // Export card visibility is controlled by renderFilters() below
+  document.getElementById('exportCard').style.display = 'none';
   // Show filters
   document.getElementById('filtersCard').style.display = '';
   renderFilters();
+  _updateTimeFieldUI();  // hides selector until schema arrives
   // Fire schema detection immediately (hybrid: runs in background while user sets filters)
   _detectSchema(ds);
 }
 
 function renderFilters() {
   const isS3 = activeDs.type === 's3';
-  document.getElementById('filterTraceType').style.display = isS3 ? '' : 'none';
-  document.getElementById('filterInputHash').style.display = isS3 ? '' : 'none';
-
   const actions = document.getElementById('actionButtons');
+
+  // Filter builder is shown for record-returning modes only
+  const showFilters = !isS3 || activeDs._user;
+  document.getElementById('filterToggleArea').style.display = showFilters ? '' : 'none';
+  if (showFilters) _refreshFilterFieldSelect();
+
+  // Export panel is always visible when a datasource is active
+  document.getElementById('exportCard').style.display = '';
+  _sampMode = (isS3 && !activeDs._user) ? 's3' : 'events';
+
+  // Search info badge: tell the user what field(s) the query text searches
+  const badge = document.getElementById('searchInfoBadge');
+  if (badge) {
+    let badgeText = '';
+    if (activeDs._user) {
+      badgeText = 'via proxy';
+    } else {
+      switch (activeDs.type) {
+        case 's3':         badgeText = 'full-text'; break;
+        case 'clickhouse': badgeText = 'body column'; break;
+        case 'trino':      badgeText = 'body column'; break;
+        case 'chyt':       badgeText = 'body column'; break;
+        case 'langfuse':   badgeText = 'all content'; break;
+      }
+    }
+    badge.textContent = badgeText;
+    badge.style.display = badgeText ? '' : 'none';
+  }
+
   if (isS3 && !activeDs._user) {
     // Server-configured S3: DuckDB full-text search
     actions.innerHTML =
@@ -984,10 +1689,10 @@ function searchParams() {
   const range = getTimeRange();
   if (range.start) params.set('start', range.start);
   if (range.end) params.set('end', range.end);
-  const s = document.getElementById('f_session').value.trim();
-  const t = document.getElementById('f_trace').value.trim();
-  if (s) params.set('session_id', s);
-  if (t) params.set('trace_id', t);
+  // Pass time_field to CH/Trino/CHYT backends when a non-default field is selected
+  if (_timeField) params.set('time_field', _timeField);
+  const fp = _filtersParam();
+  if (fp) params.set('filters', fp);
   return params;
 }
 
@@ -996,14 +1701,6 @@ function commonFilters() {
   const obj = {};
   if (range.start) obj.start = range.start;
   if (range.end) obj.end = range.end;
-  const s = document.getElementById('f_session').value.trim();
-  const t = document.getElementById('f_trace').value.trim();
-  const tt = document.getElementById('f_tracetype').value.trim();
-  const h = document.getElementById('f_hash').value.trim();
-  if (s) obj.session_id = s;
-  if (t) obj.trace_id = t;
-  if (tt) obj.trace_type = tt;
-  if (h) obj.input_hash = h;
   return obj;
 }
 
@@ -1034,7 +1731,39 @@ async function proxySearch(q, limit) {
     const data = await resp.json().catch(() => ({}));
     throw new Error(data.detail || 'HTTP ' + resp.status);
   }
-  return resp.json();
+  const data = await resp.json();
+  // Apply backend filters client-side for proxy connections
+  if (_filterRules.length && data.results) {
+    data.results = _applyFiltersClientSide(data.results);
+  }
+  return data;
+}
+
+/** Mirror of Python apply_filters — used only for proxy (user) connections. */
+function _applyFiltersClientSide(records) {
+  return records.filter(rec =>
+    _filterRules.every(r => {
+      const v = _getNestedValue(rec, r.field);
+      if (r.op === 'is_null')  return v == null || v === '';
+      if (r.op === 'not_null') return v != null && v !== '';
+      if (v == null) return false;
+      const sv = String(typeof v === 'object' ? JSON.stringify(v) : v).toLowerCase();
+      const fv = (r.value || '').toLowerCase();
+      if (r.op === 'contains')     return sv.includes(fv);
+      if (r.op === 'not_contains') return !sv.includes(fv);
+      if (r.op === 'eq')           return sv === fv;
+      if (r.op === 'neq')          return sv !== fv;
+      if (r.op === 'starts_with')  return sv.startsWith(fv);
+      try {
+        const nv = parseFloat(sv), nfv = parseFloat(r.value || '0');
+        if (r.op === 'gt')  return nv > nfv;
+        if (r.op === 'lt')  return nv < nfv;
+        if (r.op === 'gte') return nv >= nfv;
+        if (r.op === 'lte') return nv <= nfv;
+      } catch {}
+      return true;
+    })
+  );
 }
 
 // ══════════════════════════════════════════
@@ -1109,10 +1838,6 @@ async function loadLogs() {
   status.textContent = 'Loading...';
   document.getElementById('urls').innerHTML = '';
   const params = searchParams();
-  const tt = document.getElementById('f_tracetype').value.trim();
-  const h = document.getElementById('f_hash').value.trim();
-  if (tt) params.set('trace_type', tt);
-  if (h) params.set('input_hash', h);
   try {
     const resp = await fetch(BASE + '/api/public/logs/list?' + params, {
       headers: { 'Authorization': authHeader() }
@@ -1131,10 +1856,6 @@ async function fullTextSearch() {
   status.textContent = 'Searching...';
   const params = searchParams();
   params.set('q', q);
-  const tt = document.getElementById('f_tracetype').value.trim();
-  const h = document.getElementById('f_hash').value.trim();
-  if (tt) params.set('trace_type', tt);
-  if (h) params.set('input_hash', h);
   try {
     const resp = await fetch(BASE + '/api/public/logs/search?' + params, {
       headers: { 'Authorization': authHeader() }
@@ -1204,16 +1925,7 @@ function renderEventsTable(events) {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
   document.getElementById('results').style.display = events.length ? '' : 'none';
-
-  const resultActions = document.getElementById('resultActions');
-  const importBtnEv = targets.length
-    ? '<button class="btn-secondary" onclick="showImportModal(\'events\')">Import to dataset service</button>'
-    : '';
-  resultActions.innerHTML =
-    '<button class="btn-primary" onclick="downloadEventsJson()">Download catalog</button>' +
-    '<button class="btn-secondary" onclick="downloadEventsJsonl()">Download JSONL</button>' +
-    '<button class="btn-secondary" onclick="exportEventsDataset()">Export as dataset</button>' +
-    importBtnEv;
+  document.getElementById('resultActions').innerHTML = '';
 
   events.forEach((ev, i) => {
     const b = parseBody(ev.body);
@@ -1238,16 +1950,7 @@ function renderFilesTable(files) {
   const tbody = document.getElementById('tbody');
   tbody.innerHTML = '';
   document.getElementById('results').style.display = files.length ? '' : 'none';
-
-  const resultActions = document.getElementById('resultActions');
-  const importBtn = targets.length
-    ? '<button class="btn-secondary" onclick="showImportModal(\'s3\')">Import to dataset service</button>'
-    : '';
-  resultActions.innerHTML =
-    '<button class="btn-primary" onclick="getUrls()">Download catalog</button>' +
-    '<button class="btn-secondary" onclick="getIndex()">Download JSONL</button>' +
-    '<button class="btn-secondary" onclick="getDataset()">Export as dataset</button>' +
-    importBtn;
+  document.getElementById('resultActions').innerHTML = '';
 
   files.forEach(f => {
     const tr = document.createElement('tr');
@@ -1284,50 +1987,9 @@ function getSelectedEvents() {
   return currentEvents;
 }
 
-function downloadEventsJson() {
-  const events = getSelectedEvents();
-  if (!events.length) return;
-  downloadFile(JSON.stringify(events, null, 2), 'catalog.json', 'application/json');
-  document.getElementById('urls').textContent = 'Downloaded ' + events.length + ' event(s).';
-}
-
-async function downloadEventsJsonl() {
-  const urlsDiv = document.getElementById('urls');
-  if (currentSearchKeys.length) {
-    urlsDiv.textContent = 'Fetching URLs...';
-    try {
-      const resp = await fetch(BASE + '/api/public/logs/urls?datasource=' + encodeURIComponent(activeDs.name), {
-        method: 'POST',
-        headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keys: currentSearchKeys })
-      });
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      const data = await resp.json();
-      const lines = data.files.map(f => JSON.stringify({ key: f.key, url: f.url }));
-      downloadFile(lines.join('\n') + '\n', 'index.jsonl', 'application/x-ndjson');
-      urlsDiv.textContent = 'Downloaded JSONL with ' + data.files.length + ' presigned URL(s).';
-    } catch (e) { urlsDiv.textContent = 'Error: ' + e.message; }
-    return;
-  }
-  const events = getSelectedEvents();
-  if (!events.length) return;
-  const lines = events.map(e => JSON.stringify(e));
-  downloadFile(lines.join('\n') + '\n', 'events.jsonl', 'application/x-ndjson');
-  urlsDiv.textContent = 'Downloaded ' + events.length + ' event(s) as JSONL.';
-}
-
-function exportEventsDataset() {
-  const events = getSelectedEvents();
-  const dataset = eventsToDataset(events);
-  if (!dataset.length) {
-    document.getElementById('urls').textContent = 'No valid conversations found.';
-    return;
-  }
-  downloadFile(JSON.stringify(dataset, null, 2), 'dataset.json', 'application/json');
-  document.getElementById('urls').textContent = 'Exported ' + dataset.length + ' conversation(s) as dataset.';
-}
-
-// S3 file actions
+// ══════════════════════════════════════════
+//  S3 file fetch helpers
+// ══════════════════════════════════════════
 
 async function fetchFileEvents(keys) {
   const resp = await fetch(BASE + '/api/public/logs/urls?datasource=' + encodeURIComponent(activeDs.name), {
@@ -1342,54 +2004,39 @@ async function fetchFileEvents(keys) {
     const r = await fetch(f.url);
     if (!r.ok) throw new Error('Failed to fetch ' + f.key);
     const text = await r.text();
-    all.push(...text.trim().split('\n').map(line => JSON.parse(line)));
+    all.push(...text.trim().split('\n').filter(Boolean).map(line => JSON.parse(line)));
   }
   return all;
 }
 
-async function getUrls() {
-  const keys = [...document.querySelectorAll('.sel:checked')].map(c => c.value);
-  if (!keys.length) return;
-  const urlsDiv = document.getElementById('urls');
-  urlsDiv.textContent = 'Fetching...';
-  try {
-    const events = await fetchFileEvents(keys);
-    downloadFile(JSON.stringify(events, null, 2), 'catalog.json', 'application/json');
-    urlsDiv.textContent = 'Downloaded ' + events.length + ' event(s).';
-  } catch (e) { urlsDiv.textContent = 'Error: ' + e.message; }
+// Returns [{filename, events}] — preserves per-file grouping for ZIP downloads
+async function _fetchFileEventsGrouped(keys) {
+  const resp = await fetch(BASE + '/api/public/logs/urls?datasource=' + encodeURIComponent(activeDs.name), {
+    method: 'POST',
+    headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys })
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const data = await resp.json();
+  const groups = [];
+  for (const f of data.files) {
+    const r = await fetch(f.url);
+    if (!r.ok) throw new Error('Failed to fetch ' + f.key);
+    const text = await r.text();
+    const evs = text.trim().split('\n').filter(Boolean).map(line => JSON.parse(line));
+    groups.push({ filename: f.key.split('/').pop() || f.key, events: evs });
+  }
+  return groups;
 }
 
-async function getIndex() {
-  const keys = [...document.querySelectorAll('.sel:checked')].map(c => c.value);
-  if (!keys.length) return;
-  const urlsDiv = document.getElementById('urls');
-  urlsDiv.textContent = 'Fetching URLs...';
-  try {
-    const resp = await fetch(BASE + '/api/public/logs/urls?datasource=' + encodeURIComponent(activeDs.name), {
-      method: 'POST',
-      headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ keys })
-    });
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
-    const lines = data.files.map(f => JSON.stringify({ url: f.url }));
-    downloadFile(lines.join('\n') + '\n', 'index.jsonl', 'application/x-ndjson');
-    urlsDiv.textContent = 'Downloaded index with ' + data.files.length + ' file(s).';
-  } catch (e) { urlsDiv.textContent = 'Error: ' + e.message; }
-}
-
-async function getDataset() {
-  const keys = [...document.querySelectorAll('.sel:checked')].map(c => c.value);
-  if (!keys.length) return;
-  const urlsDiv = document.getElementById('urls');
-  urlsDiv.textContent = 'Building dataset...';
-  try {
-    const events = await fetchFileEvents(keys);
-    const dataset = eventsToDataset(events);
-    if (!dataset.length) { urlsDiv.textContent = 'No valid conversations found.'; return; }
-    downloadFile(JSON.stringify(dataset, null, 2), 'dataset.json', 'application/json');
-    urlsDiv.textContent = 'Exported ' + dataset.length + ' conversation(s) as dataset.';
-  } catch (e) { urlsDiv.textContent = 'Error: ' + e.message; }
+async function _fetchPresignedUrls(keys) {
+  const resp = await fetch(BASE + '/api/public/logs/urls?datasource=' + encodeURIComponent(activeDs.name), {
+    method: 'POST',
+    headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keys })
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  return (await resp.json()).files; // [{key, url}]
 }
 
 async function previewFile(btn) {
@@ -1430,6 +2077,36 @@ function eventsToDataset(events) {
   return dataset;
 }
 
+/** Apply column-mask filter: keep only visibleColumns fields (dot-notation paths). */
+function _applyColMask(events) {
+  if (!_expColMask) return events;
+  const cache = activeDs && _schemaCache[activeDs.name];
+  const cols = cache && cache.visibleColumns;
+  if (!cols || !cols.length) return events;
+
+  function pickPaths(obj, paths) {
+    const result = {};
+    for (const path of paths) {
+      const parts = path.split('.');
+      let src = obj, dst = result;
+      let valid = true;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (src == null || src[parts[i]] == null || typeof src[parts[i]] !== 'object') { valid = false; break; }
+        src = src[parts[i]];
+        if (dst[parts[i]] == null) dst[parts[i]] = {};
+        dst = dst[parts[i]];
+      }
+      if (valid && src != null) {
+        const last = parts[parts.length - 1];
+        if (src[last] !== undefined) dst[last] = src[last];
+      }
+    }
+    return result;
+  }
+
+  return events.map(ev => pickPaths(ev, cols));
+}
+
 function downloadFile(content, filename, type) {
   const blob = new Blob([content], { type });
   const url = URL.createObjectURL(blob);
@@ -1438,7 +2115,7 @@ function downloadFile(content, filename, type) {
 }
 
 // ══════════════════════════════════════════
-//  Import to dataset service
+//  Export modal
 // ══════════════════════════════════════════
 
 function suggestDatasetName() {
@@ -1452,12 +2129,374 @@ function suggestDatasetName() {
   return parts.filter(Boolean).join('_');
 }
 
+function showExportModal(mode) {
+  _exportMode = mode;
+  _exportDest = 'pc';
+  _exportFormat = 'jsonl';
+  // Sampling state (_sampRules, _sampSchema, etc.) is global — set via the Sampling panel
+
+  const selectedCount = document.querySelectorAll('.sel:checked').length;
+  const totalCount = mode === 's3'
+    ? (selectedCount || document.querySelectorAll('.sel').length)
+    : (selectedCount || currentEvents.length);
+  const itemLabel = mode === 's3' ? 'file' : 'event';
+  const countLabel = selectedCount
+    ? selectedCount + ' ' + itemLabel + '(s) selected'
+    : totalCount + ' ' + itemLabel + '(s)';
+
+  showModal('Export', '');
+  document.querySelector('.modal-body').innerHTML = _buildExportStep1Html(countLabel, mode);
+  // pre-select pc card
+  document.querySelector('.export-dest-card[data-dest="pc"]').classList.add('selected');
+  document.querySelector('.export-fmt-opt[data-fmt="jsonl"]').classList.add('selected');
+  document.querySelector('.export-fmt-opt[data-fmt="jsonl"] input').checked = true;
+}
+
+function _buildExportStep1Html(countLabel, mode) {
+  const svcDisabled = targets.length === 0 ? ' disabled' : '';
+  return '<div id="exp_step1">' +
+    '<div style="font-size:.82rem;color:#6b7280;margin-bottom:2px">Exporting <b>' + esc(countLabel) + '</b></div>' +
+    '<div class="export-section-label">Destination</div>' +
+    '<div class="export-dest-grid">' +
+      '<div class="export-dest-card" data-dest="pc" onclick="_selDest(\'pc\')">' +
+        '<div class="dest-icon">💻</div>' +
+        '<div class="dest-label">Download to PC</div>' +
+        '<div class="dest-desc">Save file(s) directly to your computer</div>' +
+      '</div>' +
+      '<div class="export-dest-card' + svcDisabled + '" data-dest="service" onclick="_selDest(\'service\')">' +
+        '<div class="dest-icon">☁️</div>' +
+        '<div class="dest-label">Dataset service</div>' +
+        '<div class="dest-desc">' + (targets.length ? 'Upload to ' + esc(targets[0].name) : 'No targets configured') + '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="export-section-label">Format</div>' +
+    '<div class="export-fmt-list">' +
+      _fmtOpt('individual', '📁 Individual files',
+        mode === 's3' ? 'One JSON file per S3 batch — bundled as ZIP' : 'One JSON file per event — bundled as ZIP') +
+      _fmtOpt('jsonl', '📄 JSONL — raw',
+        'All records as newline-delimited JSON (.jsonl)') +
+      _fmtOpt('jsonl_conv', '💬 JSONL — conversations',
+        'Transform to OpenAI <code>{messages:[{role,content}]}</code> format') +
+      _fmtOpt('catalog', '🔗 Catalog',
+        mode === 's3' ? 'Presigned URL index — links back to S3 source files' : 'Pretty-printed JSON array of all records') +
+    '</div>' +
+    '<div id="exp_status"></div>' +
+    '<div class="actions">' +
+      '<button class="btn-secondary" onclick="closeModal()">Cancel</button>' +
+      '<button class="btn-primary" id="exp_btn" onclick="_advanceExport()">Export</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function _fmtOpt(fmt, label, desc) {
+  return '<label class="export-fmt-opt" data-fmt="' + fmt + '" onclick="_selFmt(\'' + fmt + '\')">' +
+    '<input type="radio" name="exp_fmt" value="' + fmt + '">' +
+    '<div><div class="fo-label">' + label + '</div><div class="fo-desc">' + desc + '</div></div>' +
+  '</label>';
+}
+
+function _selDest(dest) {
+  _exportDest = dest;
+  document.querySelectorAll('.export-dest-card').forEach(c => c.classList.toggle('selected', c.dataset.dest === dest));
+  const btn = document.getElementById('exp_btn');
+  if (btn) btn.textContent = dest === 'service' ? 'Next →' : 'Export';
+}
+
+function _selFmt(fmt) {
+  _exportFormat = fmt;
+  document.querySelectorAll('.export-fmt-opt').forEach(o => o.classList.toggle('selected', o.dataset.fmt === fmt));
+  const radio = document.querySelector('.export-fmt-opt[data-fmt="' + fmt + '"] input');
+  if (radio) radio.checked = true;
+}
+
+async function _advanceExport() {
+  if (_exportDest === 'pc') {
+    const statusEl = document.getElementById('exp_status');
+    if (statusEl) statusEl.innerHTML = '<div class="import-status info">Preparing download…</div>';
+    const btn = document.getElementById('exp_btn');
+    if (btn) btn.disabled = true;
+    try {
+      await _execPcDownload(_exportMode);
+      closeModal();
+    } catch (e) {
+      if (statusEl) statusEl.innerHTML = '<div class="import-status err">Error: ' + esc(e.message) + '</div>';
+      if (btn) btn.disabled = false;
+    }
+  } else {
+    // advance to step 2 — dataset service settings
+    const suggested = suggestDatasetName();
+    const t = targets[0];
+    const targetOptions = targets.map(t => '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>').join('');
+    const accessOptions = ['public', 'organization', 'task', 'private'].map(a =>
+      '<option value="' + a + '"' + (a === t.default_access ? ' selected' : '') + '>' + a + '</option>'
+    ).join('');
+    const typeOptions = ['DATASET', 'BUCKET', 'TEMPLATE', 'BUNDLE', 'LORA_LEARNING'].map(v =>
+      '<option value="' + v + '"' + (v === t.default_dataset_type ? ' selected' : '') + '>' + v + '</option>'
+    ).join('');
+
+    const selectedCount = document.querySelectorAll('.sel:checked').length;
+    const totalCount = _exportMode === 's3'
+      ? (selectedCount || document.querySelectorAll('.sel').length)
+      : (selectedCount || currentEvents.length);
+    const itemLabel = _exportMode === 's3' ? 'file' : 'event';
+    const fmtLabel = { individual: 'individual files', jsonl: 'JSONL raw', jsonl_conv: 'JSONL conversations', catalog: 'catalog' };
+
+    const optBadges = [
+      _sampRules.length ? '⚗ ' + _sampRules.length + ' sampling rule(s)' : '',
+      _expColMask       ? '⬛ column mask' : '',
+      _expAssetResolve  ? '📎 asset resolution' : '',
+    ].filter(Boolean);
+    const optSummary = optBadges.length
+      ? '<div class="hint" style="margin-top:6px;color:#1e40af;background:#eff6ff;padding:5px 8px;border-radius:4px">' + optBadges.map(esc).join(' · ') + '</div>'
+      : '';
+    document.querySelector('.modal-body').innerHTML =
+      '<div class="import-form" id="imp_form">' +
+        '<div class="hint" style="margin-top:0">' +
+          esc(totalCount + ' ' + itemLabel + '(s) · ' + (fmtLabel[_exportFormat] || _exportFormat)) + ' → ' + esc(t.name) +
+        '</div>' +
+        optSummary +
+        '<label>Target</label><select id="imp_target">' + targetOptions + '</select>' +
+        '<label>Dataset name</label><input type="text" id="imp_name" value="' + esc(suggested) + '">' +
+        '<label>Access</label><select id="imp_access">' + accessOptions + '</select>' +
+        '<label>Dataset type</label><select id="imp_type">' + typeOptions + '</select>' +
+        '<div id="imp_status"></div>' +
+        '<div class="actions">' +
+          '<button class="btn-secondary" onclick="showExportModal(_exportMode)">← Back</button>' +
+          '<button class="btn-primary" id="imp_submit" onclick="_execServiceExport()">Export</button>' +
+        '</div>' +
+      '</div>';
+  }
+}
+
+// ── PC download implementations ─────────────────────────────────────────────
+
+async function _execPcDownload(mode) {
+  switch (_exportFormat) {
+    case 'individual':   return _dlZip(mode);
+    case 'jsonl':        return _dlJsonl(mode);
+    case 'jsonl_conv':   return _dlConversations(mode);
+    case 'catalog':      return _dlCatalog(mode);
+    default: throw new Error('Unknown format: ' + _exportFormat);
+  }
+}
+
+async function _dlZip(mode) {
+  if (typeof JSZip === 'undefined') throw new Error('JSZip library not loaded');
+  const zip = new JSZip();
+  if (mode === 's3') {
+    const keys = _collectKeys('s3');
+    if (!keys || !keys.length) throw new Error('No files selected');
+    const groups = await _fetchFileEventsGrouped(keys);
+    for (const g of groups) {
+      const masked = _applyColMask(g.events);
+      zip.file(g.filename, JSON.stringify(masked, null, 2));
+    }
+  } else {
+    const events = _applyColMask(getSelectedEvents());
+    if (!events.length) throw new Error('No results to export');
+    events.forEach((ev, i) => {
+      const id = ev.id || ev.trace_id || String(i);
+      zip.file('event-' + String(i).padStart(4, '0') + '-' + String(id).slice(0, 20).replace(/[^a-zA-Z0-9_-]/g, '_') + '.json',
+        JSON.stringify(ev, null, 2));
+    });
+  }
+  const blob = await zip.generateAsync({ type: 'blob', compression: 'DEFLATE' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = 'export.zip'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function _dlJsonl(mode) {
+  let events;
+  if (mode === 's3') {
+    const keys = _collectKeys('s3');
+    if (!keys || !keys.length) throw new Error('No files selected');
+    events = await fetchFileEvents(keys);
+  } else {
+    events = getSelectedEvents();
+    if (!events.length) throw new Error('No results to export');
+  }
+  events = _applyColMask(events);
+  const lines = events.map(e => JSON.stringify(e)).join('\n') + '\n';
+  downloadFile(lines, 'events.jsonl', 'application/x-ndjson');
+}
+
+async function _dlConversations(mode) {
+  let events;
+  if (mode === 's3') {
+    const keys = _collectKeys('s3');
+    if (!keys || !keys.length) throw new Error('No files selected');
+    events = await fetchFileEvents(keys);
+  } else {
+    events = getSelectedEvents();
+    if (!events.length) throw new Error('No results to export');
+  }
+  const conv = eventsToDataset(events);
+  if (!conv.length) throw new Error('No valid conversations found (need input + output messages)');
+  downloadFile(conv.map(c => JSON.stringify(c)).join('\n') + '\n', 'conversations.jsonl', 'application/x-ndjson');
+}
+
+async function _dlCatalog(mode) {
+  if (mode === 's3') {
+    const keys = _collectKeys('s3');
+    if (!keys || !keys.length) throw new Error('No files selected');
+    const files = await _fetchPresignedUrls(keys);
+    const lines = files.map(f => JSON.stringify({ key: f.key, url: f.url })).join('\n') + '\n';
+    downloadFile(lines, 'catalog.jsonl', 'application/x-ndjson');
+  } else {
+    const events = getSelectedEvents();
+    if (!events.length) throw new Error('No results to export');
+    downloadFile(JSON.stringify(events, null, 2), 'catalog.json', 'application/json');
+  }
+}
+
+// ── Dataset service upload ───────────────────────────────────────────────────
+
+async function _execServiceExport() {
+  const name = document.getElementById('imp_name').value.trim();
+  const statusDiv = document.getElementById('imp_status');
+  if (!name) {
+    statusDiv.innerHTML = '<div class="import-status err">Dataset name is required</div>';
+    return;
+  }
+
+  const mode = _exportMode;
+  const fmt = _exportFormat;
+
+  // Validate we have data to export
+  if (mode === 's3') {
+    const keys = _collectKeys('s3');
+    if (!keys || !keys.length) {
+      statusDiv.innerHTML = '<div class="import-status err">No files selected</div>';
+      return;
+    }
+  } else {
+    if (!currentEvents.length) {
+      statusDiv.innerHTML = '<div class="import-status err">No results to import</div>';
+      return;
+    }
+  }
+
+  const target = document.getElementById('imp_target').value;
+  const access = document.getElementById('imp_access').value;
+  const dataset_type = document.getElementById('imp_type').value;
+  document.getElementById('imp_submit').disabled = true;
+  statusDiv.innerHTML = '<div class="import-status info">Preparing export…</div>';
+
+  const samplingPayload = _sampRules.length ? _sampRules.map(r => ({
+    strategy: r.strategy, rate: parseFloat(r.rate) || 1,
+    field: r.field || null, params: r.params || {},
+  })) : null;
+  // Read sampling config from the global Sampling panel (not injected in this modal)
+  const strictSchema = document.getElementById('samp_strict') ? document.getElementById('samp_strict').checked : false;
+  const maxTracesEl = document.getElementById('samp_max_traces');
+  const maxTraces = maxTracesEl && maxTracesEl.value ? parseInt(maxTracesEl.value) : null;
+  const schemaSnapshot = Object.keys(_sampSchema).length
+    ? Object.fromEntries(Object.entries(_sampSchema).map(([k, v]) => [k, v.type]))
+    : null;
+  // Export options from the export panel
+  const colMaskFields = _expColMask
+    ? ((_schemaCache[activeDs.name] || {}).visibleColumns || null)
+    : null;
+
+  try {
+    let resp, totalCount;
+
+    if (mode === 's3' && fmt === 'individual') {
+      // Native S3 path — worker downloads files from S3 directly (most efficient)
+      const keys = _collectKeys('s3');
+      totalCount = keys.length;
+      resp = await fetch(BASE + '/api/public/export/dataset', {
+        method: 'POST',
+        headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target, datasource: activeDs.name, keys, dataset_name: name, access, dataset_type,
+          sampling: samplingPayload, strict_schema: strictSchema,
+          schema_snapshot: schemaSnapshot, max_traces: maxTraces,
+          col_mask: colMaskFields, asset_resolve: _expAssetResolve || null,
+        }),
+      });
+    } else {
+      // Events path — browser fetches S3 content if needed, then sends events array
+      let events;
+      if (mode === 's3') {
+        statusDiv.innerHTML = '<div class="import-status info">Fetching S3 files…</div>';
+        const keys = _collectKeys('s3');
+        if (fmt === 'catalog') {
+          // Catalog for S3: upload presigned URL list
+          const files = await _fetchPresignedUrls(keys);
+          events = files.map(f => ({ key: f.key, url: f.url }));
+        } else {
+          events = await fetchFileEvents(keys);
+          if (fmt === 'jsonl_conv') events = eventsToDataset(events);
+        }
+      } else {
+        events = [...currentEvents];
+        if (fmt === 'jsonl_conv') events = eventsToDataset(events);
+      }
+      // Apply column mask client-side before sending
+      events = _applyColMask(events);
+      totalCount = events.length;
+      // Determine backend format: jsonl_conv already transformed → send as jsonl
+      const backendFmt = (fmt === 'jsonl_conv') ? 'jsonl' : (fmt === 'catalog' && mode === 's3' ? 'catalog' : fmt);
+      statusDiv.innerHTML = '<div class="import-status info">Queuing import…</div>';
+      resp = await fetch(BASE + '/api/public/export/dataset/events', {
+        method: 'POST',
+        headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          target, datasource: activeDs.name, events, dataset_name: name, access, dataset_type,
+          format: backendFmt,
+          sampling: samplingPayload, strict_schema: strictSchema,
+          schema_snapshot: schemaSnapshot, max_traces: maxTraces,
+          asset_resolve: _expAssetResolve || null,
+        }),
+      });
+    }
+
+    const data = await resp.json();
+    if (!resp.ok) {
+      statusDiv.innerHTML = '<div class="import-status err">Error: ' + esc(data.detail || resp.statusText) + '</div>';
+      document.getElementById('imp_submit').disabled = false;
+      return;
+    }
+    _showImportProgress(data.job_id, totalCount, data.warning);
+    if (data.job_id === null) {
+      _renderImportDone(data.progress, data.result);
+    } else {
+      _pollImportStatus(data.job_id);
+    }
+  } catch (e) {
+    statusDiv.innerHTML = '<div class="import-status err">Error: ' + esc(e.message) + '</div>';
+    document.getElementById('imp_submit').disabled = false;
+  }
+}
+
 // ── Sampling state ──────────────────────────────────────────────────────────
 let _sampSchema = {};      // { fieldName: {type, example} }
 let _sampRules = [];       // array of rule objects
 let _sampOpen = false;
-let _sampMode = 's3';      // current import mode
-let _sampKeys = [];        // keys available for schema discovery
+let _sampMode = 's3';      // 's3' | 'events' — set by renderFilters based on active datasource
+let _exportDest = 'pc';    // 'pc' | 'service'
+let _exportFormat = 'jsonl'; // 'jsonl' | 'individual' | 'jsonl_conv' | 'catalog'
+let _exportMode = 's3';    // 's3' | 'events' — set by showExportModal
+let _expColMask = false;
+let _expAssetResolve = false;
+let _filterMode = 'and';
+let _maskRules = [];       // [{ field, action, max_length }]
+let _assetSources = [];    // ['field.path', ...]
+let _assetFetchMode = 'metadata_only';
+let _assetCheckAvail = false;
+let _destTarget = '';
+let _destDatasetName = '';
+let _destAccess = 'organization';
+let _destDatasetType = 'DATASET';
+let _webhookUrl = '';
+let _webhookHeadersRaw = '';
+let _webhookSecret = '';
+let _webhookTimeout = 30;
+let _scheduleCron = '';
+let _scheduleTz = 'UTC';
+let _scheduleEnabled = true;
 
 const STRATEGY_CATALOG = {
   random: {
@@ -1645,8 +2684,9 @@ function _renderExtraParams(ruleIdx, rule, def) {
 
 function _renderRules() {
   if (!_sampRules.length) {
-    document.getElementById('imp_rules').innerHTML = '<div style="font-size:.8rem;color:#aaa;padding:4px 0">No strategies added — all traces will be imported.</div>';
+    document.getElementById('samp_rules').innerHTML = '<div style="font-size:.8rem;color:#aaa;padding:4px 0">No strategies added — all traces will be exported.</div>';
     _renderYield();
+    _updateSampBadge();
     return;
   }
   const html = _sampRules.map((rule, i) => {
@@ -1670,12 +2710,13 @@ function _renderRules() {
       _renderStrategyDesc(def) +
     '</div>';
   }).join('');
-  document.getElementById('imp_rules').innerHTML = html;
+  document.getElementById('samp_rules').innerHTML = html;
   _renderYield();
+  _updateSampBadge();
 }
 
 function _renderYield() {
-  const el = document.getElementById('imp_yield');
+  const el = document.getElementById('samp_yield');
   if (!el) return;
   if (!_sampRules.length) { el.style.display = 'none'; return; }
   const totalRate = _sampRules.reduce((s, r) => s + (parseFloat(r.rate) || 0), 0);
@@ -1689,7 +2730,7 @@ function _renderYield() {
 }
 
 function addSampRule() {
-  const sel = document.getElementById('imp_strat_select');
+  const sel = document.getElementById('samp_strat_select');
   const stratKey = sel.value;
   const def = STRATEGY_CATALOG[stratKey];
   if (!def) return;
@@ -1705,38 +2746,58 @@ function removeSampRule(i) {
 
 function toggleSampling() {
   _sampOpen = !_sampOpen;
-  const btn = document.getElementById('imp_samp_btn');
-  const panel = document.getElementById('imp_samp_panel');
+  const btn = document.getElementById('samp_btn');
+  const panel = document.getElementById('samp_panel');
   if (_sampOpen) {
-    btn.classList.add('active');
-    btn.textContent = '⚙ Sampling ▲';
     panel.style.display = 'block';
+    // Populate strategy select on first open
+    const sel = document.getElementById('samp_strat_select');
+    if (sel && !sel.options.length) _initSampStratSelect();
     if (!Object.keys(_sampSchema).length) _loadSampSchema();
   } else {
-    btn.classList.remove('active');
-    btn.textContent = '⚙ Configure Sampling ▼';
     panel.style.display = 'none';
+  }
+  _updateSampBadge();
+}
+
+function _initSampStratSelect() {
+  const sel = document.getElementById('samp_strat_select');
+  if (!sel) return;
+  sel.innerHTML = Object.entries(STRATEGY_CATALOG).map(([k, v]) => {
+    const avail = _strategyAvailable(k);
+    return '<option value="' + k + '">' + esc(v.label) + (avail ? '' : ' (field missing)') + '</option>';
+  }).join('');
+}
+
+function _updateSampBadge() {
+  const btn = document.getElementById('samp_btn');
+  if (!btn) return;
+  const count = _sampRules.length;
+  const arrow = _sampOpen ? '▲' : '▼';
+  if (count) {
+    btn.classList.add('active');
+    btn.innerHTML = '⚗ Sampling <span class="filter-badge">' + count + '</span> ' + arrow;
+  } else {
+    btn.classList.remove('active');
+    btn.textContent = '⚗ Sampling ' + arrow;
   }
 }
 
 async function _loadSampSchema() {
-  const schemaArea = document.getElementById('imp_schema_area');
+  const schemaArea = document.getElementById('samp_schema_area');
   schemaArea.innerHTML = '<span style="color:#aaa;font-size:.78rem">Loading schema…</span>';
   try {
     const params = new URLSearchParams({ datasource: activeDs.name });
     if (_sampMode === 's3') {
-      _sampKeys.slice(0, 5).forEach(k => params.append('keys', k));
+      // Use currently visible S3 keys (from result table) for schema sampling
+      const keys = _collectKeys('s3') || [];
+      keys.slice(0, 5).forEach(k => params.append('keys', k));
     }
-    // pass active filters if available
+    // pass active time range if available
     const fromEl = document.getElementById('time_from');
     const toEl   = document.getElementById('time_to');
     if (fromEl && fromEl.value) params.set('start', new Date(fromEl.value).toISOString());
     if (toEl   && toEl.value)   params.set('end',   new Date(toEl.value).toISOString());
-    ['f_session','f_trace','f_tracetype','f_hash'].forEach((id, j) => {
-      const fld = ['session_id','trace_id','trace_type','input_hash'][j];
-      const el = document.getElementById(id);
-      if (el && el.value.trim()) params.set(fld, el.value.trim());
-    });
 
     const resp = await fetch(BASE + '/api/public/datasource/sample?' + params, {
       headers: { 'Authorization': authHeader() },
@@ -1745,14 +2806,16 @@ async function _loadSampSchema() {
     const data = await resp.json();
     _sampSchema = data.fields || {};
     _renderSchemaChips();
-    document.getElementById('imp_samp_options').style.display = 'block';
+    document.getElementById('samp_options').style.display = 'block';
+    // Re-populate strategy select now that we have schema info
+    _initSampStratSelect();
   } catch (e) {
     schemaArea.innerHTML = '<span style="color:#dc2626;font-size:.78rem">Schema load failed: ' + esc(e.message) + '</span>';
   }
 }
 
 function _renderSchemaChips() {
-  const schemaArea = document.getElementById('imp_schema_area');
+  const schemaArea = document.getElementById('samp_schema_area');
   const keys = Object.keys(_sampSchema);
   if (!keys.length) {
     schemaArea.innerHTML = '<div class="samp-schema"><span class="samp-schema-empty">No fields discovered</span></div>';
@@ -1765,157 +2828,17 @@ function _renderSchemaChips() {
   schemaArea.innerHTML = '<div class="samp-schema"><b>Schema</b> (' + keys.length + ' fields from ' + (activeDs ? esc(activeDs.name) : '') + '):<div class="samp-schema-fields">' + chips + '</div></div>';
 }
 
-function _buildSampPanel() {
-  const stratOpts = Object.entries(STRATEGY_CATALOG).map(([k, v]) => {
-    const avail = _strategyAvailable(k);
-    return '<option value="' + k + '"' + (avail ? '' : '') + '>' + esc(v.label) + (avail ? '' : ' (field missing)') + '</option>';
-  }).join('');
-  return '<div id="imp_samp_panel" style="display:none" class="samp-panel">' +
-    '<div id="imp_schema_area"><span style="color:#aaa;font-size:.78rem">Click to load schema</span></div>' +
-    '<div id="imp_samp_options" style="display:none">' +
-      '<label class="samp-strict"><input type="checkbox" id="imp_strict"> Ignore traces with mismatched structure</label>' +
-      '<div class="samp-max"><label>Max traces</label><input type="number" id="imp_max_traces" placeholder="no limit" min="1" style="width:100px"></div>' +
-      '<div class="samp-rules" id="imp_rules"></div>' +
-      '<div class="samp-add-row">' +
-        '<select id="imp_strat_select">' + stratOpts + '</select>' +
-        '<button class="btn-secondary btn-sm" onclick="addSampRule()">+ Add strategy</button>' +
-      '</div>' +
-      '<div id="imp_yield" class="samp-yield" style="display:none"></div>' +
-    '</div>' +
-  '</div>';
-}
-
-function showImportModal(mode) {
-  _sampOpen = false;
-  _sampRules = [];
-  _sampSchema = {};
-  _sampMode = mode;
-
-  const t = targets[0];
-  const targetOptions = targets.map(t =>
-    '<option value="' + esc(t.name) + '">' + esc(t.name) + '</option>'
-  ).join('');
-  const accessOptions = ['public', 'organization', 'task', 'private'].map(a =>
-    '<option value="' + a + '"' + (a === t.default_access ? ' selected' : '') + '>' + a + '</option>'
-  ).join('');
-  const typeOptions = ['DATASET', 'BUCKET', 'TEMPLATE', 'BUNDLE', 'LORA_LEARNING'].map(v =>
-    '<option value="' + v + '"' + (v === t.default_dataset_type ? ' selected' : '') + '>' + v + '</option>'
-  ).join('');
-
-  const suggested = suggestDatasetName();
-  const selectedCount = document.querySelectorAll('.sel:checked').length;
-  const totalCount = mode === 's3'
-    ? (selectedCount || document.querySelectorAll('.sel').length)
-    : (selectedCount || currentEvents.length);
-  const hint = selectedCount ? selectedCount + ' file(s) selected' : 'All ' + totalCount + ' result(s)';
-
-  // Collect keys for schema discovery
-  const keys = _collectKeys(mode);
-  _sampKeys = keys || [];
-
-  showModal('Import to dataset service', '');
-  document.querySelector('.modal-body').innerHTML =
-    '<div class="import-form" id="imp_form">' +
-      '<div class="hint" style="margin-top:0">' + esc(hint) + ' will be uploaded</div>' +
-      '<label>Target</label>' +
-      '<select id="imp_target">' + targetOptions + '</select>' +
-      '<label>Dataset name</label>' +
-      '<input type="text" id="imp_name" value="' + esc(suggested) + '">' +
-      '<label>Access</label>' +
-      '<select id="imp_access">' + accessOptions + '</select>' +
-      '<label>Dataset type</label>' +
-      '<select id="imp_type">' + typeOptions + '</select>' +
-      '<div class="samp-toggle">' +
-        '<button type="button" id="imp_samp_btn" onclick="toggleSampling()">⚙ Configure Sampling ▼</button>' +
-      '</div>' +
-      _buildSampPanel() +
-      '<div id="imp_status"></div>' +
-      '<div class="actions">' +
-        '<button class="btn-secondary" onclick="closeModal()">Cancel</button>' +
-        '<button class="btn-primary" id="imp_submit" onclick="submitImport(\'' + mode + '\')">Import</button>' +
-      '</div>' +
-    '</div>';
-}
 
 function _collectKeys(mode) {
   if (mode === 's3') {
     const checked = [...document.querySelectorAll('.sel:checked')].map(c => c.value);
     return checked.length ? checked : [...document.querySelectorAll('.sel')].map(c => c.value);
   }
-  if (!currentSearchKeys.length) return null; // not S3-backed
+  if (!currentSearchKeys.length) return null;
   const checked = [...document.querySelectorAll('.sel:checked')];
   return checked.length
     ? checked.map(c => currentSearchKeys[parseInt(c.dataset.idx)]).filter(Boolean)
     : [...currentSearchKeys];
-}
-
-async function submitImport(mode) {
-  const name = document.getElementById('imp_name').value.trim();
-  const statusDiv = document.getElementById('imp_status');
-  if (!name) {
-    statusDiv.innerHTML = '<div class="import-status err">Dataset name is required</div>';
-    return;
-  }
-
-  const keys = _collectKeys(mode);
-  if (keys === null) {
-    statusDiv.innerHTML = '<div class="import-status err">Import is only supported for S3-backed results</div>';
-    return;
-  }
-  if (!keys.length) {
-    statusDiv.innerHTML = '<div class="import-status err">No files to import</div>';
-    return;
-  }
-
-  const target = document.getElementById('imp_target').value;
-  const access = document.getElementById('imp_access').value;
-  const dataset_type = document.getElementById('imp_type').value;
-  document.getElementById('imp_submit').disabled = true;
-  statusDiv.innerHTML = '<div class="import-status info">Queuing import...</div>';
-
-  // Collect sampling config
-  const samplingPayload = _sampRules.length ? _sampRules.map(r => ({
-    strategy: r.strategy,
-    rate: parseFloat(r.rate) || 1,
-    field: r.field || null,
-    params: r.params || {},
-  })) : null;
-  const strictSchema = document.getElementById('imp_strict') ? document.getElementById('imp_strict').checked : false;
-  const maxTracesEl = document.getElementById('imp_max_traces');
-  const maxTraces = maxTracesEl && maxTracesEl.value ? parseInt(maxTracesEl.value) : null;
-  const schemaSnapshot = Object.keys(_sampSchema).length
-    ? Object.fromEntries(Object.entries(_sampSchema).map(([k,v]) => [k, v.type]))
-    : null;
-
-  try {
-    const resp = await fetch(BASE + '/api/public/export/dataset', {
-      method: 'POST',
-      headers: { 'Authorization': authHeader(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        target, datasource: activeDs.name, keys, dataset_name: name, access, dataset_type,
-        sampling: samplingPayload,
-        strict_schema: strictSchema,
-        schema_snapshot: schemaSnapshot,
-        max_traces: maxTraces,
-      }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) {
-      statusDiv.innerHTML = '<div class="import-status err">Error: ' + esc(data.detail || resp.statusText) + '</div>';
-      document.getElementById('imp_submit').disabled = false;
-      return;
-    }
-    _showImportProgress(data.job_id, keys.length, data.warning);
-    if (data.job_id === null) {
-      // sync path — result is already in the response
-      _renderImportDone(data.progress, data.result);
-    } else {
-      _pollImportStatus(data.job_id);
-    }
-  } catch (e) {
-    statusDiv.innerHTML = '<div class="import-status err">Error: ' + esc(e.message) + '</div>';
-    document.getElementById('imp_submit').disabled = false;
-  }
 }
 
 function _showImportProgress(jobId, totalFiles, warning) {
@@ -1947,11 +2870,13 @@ function _renderImportDone(progress, result) {
   if (progress) {
     const pct = progress.files_total > 0 ? Math.round(progress.files_done / progress.files_total * 100) : 100;
     document.getElementById('imp_bar').style.width = pct + '%';
-    document.getElementById('imp_files').textContent = progress.files_done + ' / ' + progress.files_total + ' files';
+    const unitLabel = result && result.unit ? result.unit + '(s)' : 'files';
+    document.getElementById('imp_files').textContent = progress.files_done + ' / ' + progress.files_total + ' ' + unitLabel;
     document.getElementById('imp_bytes').textContent = _fmtBytes(progress.bytes_done);
   }
   if (result) {
-    let msg = 'Dataset <b>' + esc(result.dataset_id) + '</b> — ' + result.files_uploaded + ' file(s) uploaded';
+    const unitLabel = result.unit ? result.unit + '(s)' : 'file(s)';
+    let msg = 'Dataset <b>' + esc(result.dataset_id) + '</b> — ' + result.files_uploaded + ' ' + unitLabel + ' uploaded';
     if (result.files_failed) msg += ', <span style="color:#dc2626">' + result.files_failed + ' failed</span>';
     document.getElementById('imp_result').innerHTML = msg;
   }
@@ -1985,8 +2910,9 @@ async function _pollImportStatus(jobId) {
     if (data.progress) {
       const p = data.progress;
       const pct = p.files_total > 0 ? Math.round(p.files_done / p.files_total * 100) : 0;
+      const unitLabel = data.result && data.result.unit ? data.result.unit + '(s)' : 'files';
       document.getElementById('imp_bar').style.width = pct + '%';
-      document.getElementById('imp_files').textContent = p.files_done + ' / ' + p.files_total + ' files';
+      document.getElementById('imp_files').textContent = p.files_done + ' / ' + p.files_total + ' ' + unitLabel;
       document.getElementById('imp_bytes').textContent = _fmtBytes(p.bytes_done);
     }
 
@@ -2025,6 +2951,300 @@ function showModal(title, content) {
 }
 
 function closeModal() { document.getElementById('modal').innerHTML = ''; }
+
+// ══════════════════════════════════════════
+//  YAML config — download / upload
+// ══════════════════════════════════════════
+
+// Map internal filter op codes ↔ human-readable YAML names
+const OP_TO_YAML = {
+  gt: 'greater_than', lt: 'less_than', gte: 'greater_than_or_equal', lte: 'less_than_or_equal',
+  eq: 'equals', neq: 'not_equals',
+  contains: 'contains', not_contains: 'not_contains', starts_with: 'starts_with',
+  in: 'in', not_in: 'not_in',
+  is_null: 'is_empty', not_null: 'not_empty',
+};
+const OP_FROM_YAML = Object.fromEntries(Object.entries(OP_TO_YAML).map(([k, v]) => [v, k]));
+
+const TIME_PRESET_LABELS = {
+  '15m': 'Last 15 minutes', '1h': 'Last 1 hour', '4h': 'Last 4 hours',
+  '24h': 'Last 24 hours', '7d': 'Last 7 days', '30d': 'Last 30 days', 'all': 'All time',
+};
+
+function _buildExportConfig() {
+  const cfg = {};
+
+  // ── ingestion ──────────────────────────────────────────────────────────────
+  if (activeDs) {
+    cfg.ingestion = { datasource: activeDs.name, type: activeDs.type };
+  }
+
+  // ── filters ────────────────────────────────────────────────────────────────
+  const filterRules = [];
+  // Time range → first rule with op: last / between
+  const timeRange = getTimeRange();
+  if (timePreset && timePreset !== 'all' && PRESETS[timePreset]) {
+    filterRules.push({ field: _timeField || 'created_at', op: 'last', value: timePreset });
+  } else if (customFrom && customTo) {
+    filterRules.push({ field: _timeField || 'created_at', op: 'between', from: customFrom, to: customTo });
+  }
+  // Backend filter rules
+  for (const r of _filterRules) {
+    const op = OP_TO_YAML[r.op] || r.op;
+    const isListOp = op === 'in' || op === 'not_in';
+    const value = isListOp
+      ? String(r.value || '').split(',').map(s => s.trim()).filter(Boolean)
+      : r.value;
+    filterRules.push({ field: r.field, op, value });
+  }
+  if (filterRules.length) {
+    cfg.filters = { mode: _filterMode, rules: filterRules };
+  }
+
+  // ── masking ────────────────────────────────────────────────────────────────
+  if (_expColMask || _maskRules.length) {
+    const cache = activeDs && _schemaCache[activeDs.name];
+    const cols = (cache && cache.visibleColumns) || [];
+    cfg.masking = {
+      default_policy: _expColMask ? 'deny' : 'allow',
+      allow_fields: _expColMask ? cols : [],
+      rules: _maskRules.map(r => {
+        const entry = { field: r.field, action: r.action };
+        if (r.action === 'truncate' && r.max_length) entry.max_length = r.max_length;
+        return entry;
+      }),
+    };
+  }
+
+  // ── asset_resolution ───────────────────────────────────────────────────────
+  if (_expAssetResolve) {
+    const ar = { enabled: true };
+    if (_assetSources.length) ar.sources = _assetSources.map(f => ({ field: f }));
+    ar.fetch_mode = _assetFetchMode;
+    if (_assetCheckAvail) ar.check_availability = true;
+    cfg.asset_resolution = ar;
+  }
+
+  // ── destination ────────────────────────────────────────────────────────────
+  if (_destTarget || _destDatasetName) {
+    const dest = {};
+    if (_destTarget) dest.datasource = _destTarget;
+    if (_destDatasetName) dest.dataset_name = _destDatasetName;
+    if (_destAccess !== 'organization') dest.access = _destAccess;
+    if (_destDatasetType !== 'DATASET') dest.dataset_type = _destDatasetType;
+    cfg.destination = dest;
+  }
+
+  // ── webhook ────────────────────────────────────────────────────────────────
+  if (_webhookUrl.trim()) {
+    const wh = { url: _webhookUrl.trim() };
+    if (_webhookHeadersRaw.trim()) {
+      const headers = {};
+      for (const line of _webhookHeadersRaw.split('\n')) {
+        const idx = line.indexOf(':');
+        if (idx > 0) headers[line.slice(0, idx).trim()] = line.slice(idx + 1).trim();
+      }
+      if (Object.keys(headers).length) wh.headers = headers;
+    }
+    if (_webhookSecret.trim()) wh.secret = _webhookSecret.trim();
+    if (_webhookTimeout !== 30) wh.timeout_seconds = _webhookTimeout;
+    cfg.webhook = wh;
+  }
+
+  // ── schedule ───────────────────────────────────────────────────────────────
+  if (_scheduleCron.trim()) {
+    cfg.schedule = { cron: _scheduleCron.trim() };
+    if (_scheduleTz && _scheduleTz !== 'UTC') cfg.schedule.timezone = _scheduleTz;
+    if (!_scheduleEnabled) cfg.schedule.enabled = false;
+  }
+
+  // ── sampling ───────────────────────────────────────────────────────────────
+  if (_sampRules.length) {
+    const strictEl = document.getElementById('samp_strict');
+    const maxEl = document.getElementById('samp_max_traces');
+    const strictSchema = strictEl ? strictEl.checked : false;
+    const maxTraces = maxEl && maxEl.value ? parseInt(maxEl.value) : null;
+
+    const strategyName = _sampRules.length === 1 ? _sampRules[0].strategy : 'hybrid';
+    const sampEntry = {
+      strategy: strategyName,
+      rules: _sampRules.map(r => {
+        const entry = { type: r.strategy, rate: Math.round((parseFloat(r.rate) || 1) / 100 * 1000) / 1000 };
+        if (r.field) entry.field = r.field;
+        if (r.params && Object.keys(r.params).length) entry.params = r.params;
+        return entry;
+      }),
+    };
+    if (strictSchema) sampEntry.strict_schema = true;
+    if (maxTraces) sampEntry.max_traces = maxTraces;
+    cfg.sampling = sampEntry;
+  }
+
+  return cfg;
+}
+
+function downloadConfigYaml() {
+  if (typeof jsyaml === 'undefined') { alert('js-yaml library not loaded'); return; }
+  const cfg = _buildExportConfig();
+  const yaml = jsyaml.dump(cfg, { indent: 2, lineWidth: 100, quotingType: '"' });
+  downloadFile(yaml, 'dataimporter-config.yaml', 'text/yaml');
+}
+
+function _onYamlFileSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  input.value = '';   // reset so same file can be re-uploaded
+  const reader = new FileReader();
+  reader.onload = e => _applyConfigYaml(e.target.result);
+  reader.readAsText(file);
+}
+
+async function _applyConfigYaml(yamlText) {
+  if (typeof jsyaml === 'undefined') { alert('js-yaml library not loaded'); return; }
+  let cfg;
+  try { cfg = jsyaml.load(yamlText); }
+  catch (e) { alert('Invalid YAML: ' + e.message); return; }
+  if (!cfg || typeof cfg !== 'object') { alert('Config must be a YAML object'); return; }
+
+  // ── ingestion — switch datasource if specified ─────────────────────────────
+  if (cfg.ingestion && cfg.ingestion.datasource) {
+    const tab = findTab(cfg.ingestion.datasource);
+    if (tab) {
+      selectDatasource(tab);
+      await new Promise(r => setTimeout(r, 80));  // let DOM settle
+    } else {
+      console.warn('[config] datasource not found:', cfg.ingestion.datasource);
+    }
+  }
+
+  // ── filters ────────────────────────────────────────────────────────────────
+  if (cfg.filters) {
+    _filterMode = cfg.filters.mode === 'or' ? 'or' : 'and';
+    _updateFilterModeUI();
+    if (Array.isArray(cfg.filters.rules)) {
+      _filterRules = [];
+      for (const r of cfg.filters.rules) {
+        if (r.op === 'last') {
+          const preset = String(r.value || '').toLowerCase();
+          if (PRESETS[preset] !== undefined) {
+            timePreset = preset; customFrom = null; customTo = null;
+            const lbl = document.getElementById('timeLabel');
+            if (lbl) lbl.textContent = TIME_PRESET_LABELS[preset] || preset;
+            document.querySelectorAll('#timePresets div').forEach(d => {
+              d.classList.toggle('active', d.textContent.trim() === (TIME_PRESET_LABELS[preset] || preset));
+            });
+          }
+        } else if (r.op === 'between') {
+          customFrom = r.from || null; customTo = r.to || null; timePreset = null;
+          const lbl = document.getElementById('timeLabel');
+          if (lbl && customFrom && customTo)
+            lbl.textContent = customFrom.substring(0, 10) + ' → ' + customTo.substring(0, 10);
+        } else {
+          const uiOp = OP_FROM_YAML[r.op] || r.op;
+          const value = Array.isArray(r.value) ? r.value.join(', ') : (r.value || '');
+          _filterRules.push({ field: r.field, op: uiOp, value });
+        }
+      }
+      if (_filterRules.length) {
+        const fp = document.getElementById('filter_panel');
+        if (fp) { fp.style.display = ''; _filtersOpen = true; }
+        _renderFilterRules();
+        _updateFilterToggleBtn();
+        _updateFilterModeUI();
+      }
+    }
+  }
+
+  // ── masking ────────────────────────────────────────────────────────────────
+  if (cfg.masking) {
+    const deny = cfg.masking.default_policy === 'deny';
+    _expColMask = deny;
+    const ecm = document.getElementById('exp_col_mask');
+    if (ecm) ecm.checked = deny;
+    if (deny && Array.isArray(cfg.masking.allow_fields) && cfg.masking.allow_fields.length) {
+      const dsName = activeDs ? activeDs.name : null;
+      if (dsName) {
+        if (!_schemaCache[dsName]) _schemaCache[dsName] = { fields: {}, defaultColumns: [], visibleColumns: [] };
+        _schemaCache[dsName].visibleColumns = cfg.masking.allow_fields;
+        _saveColumns(dsName, cfg.masking.allow_fields);
+      }
+    }
+    if (Array.isArray(cfg.masking.rules)) {
+      _maskRules = cfg.masking.rules.map(r => ({ field: r.field, action: r.action || 'remove', max_length: r.max_length || null }));
+      _renderMaskRules();
+    }
+  }
+
+  // ── sampling ───────────────────────────────────────────────────────────────
+  if (cfg.sampling && Array.isArray(cfg.sampling.rules) && cfg.sampling.rules.length) {
+    _sampRules = cfg.sampling.rules.map(r => ({
+      strategy: r.type,
+      rate: Math.round((parseFloat(r.rate) || 0.1) * 100 * 10) / 10,
+      field: r.field || null,
+      params: r.params || {},
+    }));
+    const strictEl = document.getElementById('samp_strict');
+    if (strictEl) strictEl.checked = !!cfg.sampling.strict_schema;
+    const maxEl = document.getElementById('samp_max_traces');
+    if (maxEl) maxEl.value = cfg.sampling.max_traces || '';
+    if (!_sampOpen) toggleSampling(); else _renderRules();
+  }
+
+  // ── asset_resolution ───────────────────────────────────────────────────────
+  if (cfg.asset_resolution) {
+    _expAssetResolve = !!cfg.asset_resolution.enabled;
+    const ear = document.getElementById('exp_asset_resolve');
+    if (ear) ear.checked = _expAssetResolve;
+    if (_expAssetResolve) {
+      if (Array.isArray(cfg.asset_resolution.sources)) {
+        _assetSources = cfg.asset_resolution.sources.map(s => s.field || s).filter(Boolean);
+      }
+      _assetFetchMode = cfg.asset_resolution.fetch_mode || 'metadata_only';
+      _assetCheckAvail = !!cfg.asset_resolution.check_availability;
+      _toggleAssetPanel(true);
+      const fmSel = document.getElementById('asset_fetch_mode');
+      if (fmSel) fmSel.value = _assetFetchMode;
+      const cavEl = document.getElementById('asset_check_avail');
+      if (cavEl) cavEl.checked = _assetCheckAvail;
+    }
+  }
+
+  // ── destination ────────────────────────────────────────────────────────────
+  if (cfg.destination) {
+    _destTarget = cfg.destination.datasource || '';
+    _destDatasetName = cfg.destination.dataset_name || '';
+    _destAccess = cfg.destination.access || 'organization';
+    _destDatasetType = cfg.destination.dataset_type || 'DATASET';
+    const dt = document.getElementById('dest_target'); if (dt) dt.value = _destTarget;
+    const dn = document.getElementById('dest_dataset_name'); if (dn) dn.value = _destDatasetName;
+    const da = document.getElementById('dest_access'); if (da) da.value = _destAccess;
+    const ddt = document.getElementById('dest_dataset_type'); if (ddt) ddt.value = _destDatasetType;
+  }
+
+  // ── webhook ────────────────────────────────────────────────────────────────
+  if (cfg.webhook) {
+    _webhookUrl = cfg.webhook.url || '';
+    _webhookSecret = cfg.webhook.secret || '';
+    _webhookTimeout = cfg.webhook.timeout_seconds || 30;
+    if (cfg.webhook.headers && typeof cfg.webhook.headers === 'object') {
+      _webhookHeadersRaw = Object.entries(cfg.webhook.headers).map(([k, v]) => k + ': ' + v).join('\n');
+    }
+    const wu = document.getElementById('webhook_url'); if (wu) wu.value = _webhookUrl;
+    const wh = document.getElementById('webhook_headers'); if (wh) wh.value = _webhookHeadersRaw;
+    const ws = document.getElementById('webhook_secret'); if (ws) ws.value = _webhookSecret;
+    const wt = document.getElementById('webhook_timeout'); if (wt) wt.value = _webhookTimeout;
+  }
+
+  // ── schedule ───────────────────────────────────────────────────────────────
+  if (cfg.schedule) {
+    _scheduleCron = cfg.schedule.cron || '';
+    _scheduleTz = cfg.schedule.timezone || 'UTC';
+    _scheduleEnabled = cfg.schedule.enabled !== false;
+    const sc = document.getElementById('schedule_cron'); if (sc) sc.value = _scheduleCron;
+    const st = document.getElementById('schedule_tz'); if (st) st.value = _scheduleTz;
+    const se = document.getElementById('schedule_enabled'); if (se) se.checked = _scheduleEnabled;
+  }
+}
 
 // Boot
 init();

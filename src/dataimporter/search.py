@@ -2,19 +2,23 @@
 
 from __future__ import annotations
 
-import glob as _glob
-
-import duckdb
-import duckdb_extension_httpfs
 import structlog
 
 from dataimporter.config import Datasource
 
 logger = structlog.get_logger(__name__)
 
-# Pre-locate the httpfs extension binary from the pip package
-_HTTPFS_EXT = _glob.glob(str(duckdb_extension_httpfs.__path__[0]) + "/**/httpfs.duckdb_extension", recursive=True)[0]
 _httpfs_installed = False
+_HTTPFS_EXT: str | None = None
+
+
+def _get_httpfs_ext() -> str:
+    global _HTTPFS_EXT
+    if _HTTPFS_EXT is None:
+        import glob as _glob
+        import duckdb_extension_httpfs
+        _HTTPFS_EXT = _glob.glob(str(duckdb_extension_httpfs.__path__[0]) + "/**/httpfs.duckdb_extension", recursive=True)[0]
+    return _HTTPFS_EXT
 
 
 def search_logs(
@@ -26,6 +30,8 @@ def search_logs(
     """Search inside JSONL files on S3 using DuckDB."""
     if not keys:
         return []
+
+    import duckdb
 
     endpoint = ds.endpoint or ""
     use_ssl = endpoint.startswith("https://")
@@ -43,7 +49,7 @@ def search_logs(
     })
     try:
         if not _httpfs_installed:
-            conn.install_extension(_HTTPFS_EXT, force_install=True)
+            conn.install_extension(_get_httpfs_ext(), force_install=True)
             _httpfs_installed = True
         conn.load_extension("httpfs")
         conn.execute(f"SET s3_endpoint = '{endpoint_host}';")

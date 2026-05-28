@@ -5,9 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-import aioboto3
 import structlog
-from botocore.config import Config as BotoConfig
 
 from dataimporter.auth import AuthContext
 from dataimporter.config import Datasource
@@ -15,7 +13,8 @@ from dataimporter.config import Datasource
 logger = structlog.get_logger(__name__)
 
 
-def _s3_client_config(ds: Datasource) -> BotoConfig:
+def _s3_client_config(ds: Datasource):
+    from botocore.config import Config as BotoConfig
     return BotoConfig(
         s3={"addressing_style": ds.addressing_style, "payload_signing_enabled": False},
         signature_version="s3v4",
@@ -24,7 +23,8 @@ def _s3_client_config(ds: Datasource) -> BotoConfig:
     )
 
 
-def _s3_session(ds: Datasource) -> aioboto3.Session:
+def _s3_session(ds: Datasource):
+    import aioboto3
     return aioboto3.Session(
         aws_access_key_id=ds.access_key_id,
         aws_secret_access_key=ds.secret_access_key,
