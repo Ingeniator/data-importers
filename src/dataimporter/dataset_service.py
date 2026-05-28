@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
 
 import httpx
@@ -13,32 +14,36 @@ logger = structlog.get_logger(__name__)
 
 # target name → (token, expires_at_monotonic)
 _token_cache: dict[str, tuple[str, float]] = {}
+# one lock per target name prevents concurrent refresh storms
+_token_locks: dict[str, asyncio.Lock] = {}
 
 
 async def get_token(target: DatasetTarget) -> str:
     """Return a valid Bearer token, refreshing via client_credentials if needed."""
-    now = time.monotonic()
-    cached = _token_cache.get(target.name)
-    if cached and cached[1] > now + 30:
-        return cached[0]
+    lock = _token_locks.setdefault(target.name, asyncio.Lock())
+    async with lock:
+        now = time.monotonic()
+        cached = _token_cache.get(target.name)
+        if cached and cached[1] > now + 30:
+            return cached[0]
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        resp = await client.post(
-            target.token_url,
-            data={
-                "grant_type": "client_credentials",
-                "client_id": target.client_id,
-                "client_secret": target.client_secret,
-            },
-        )
-        resp.raise_for_status()
-        body = resp.json()
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(
+                target.token_url,
+                data={
+                    "grant_type": "client_credentials",
+                    "client_id": target.client_id,
+                    "client_secret": target.client_secret,
+                },
+            )
+            resp.raise_for_status()
+            body = resp.json()
 
-    token: str = body["access_token"]
-    expires_in: int = body.get("expires_in", 300)
-    _token_cache[target.name] = (token, now + expires_in)
-    logger.debug("token_refreshed", target=target.name, expires_in=expires_in)
-    return token
+        token: str = body["access_token"]
+        expires_in: int = body.get("expires_in", 300)
+        _token_cache[target.name] = (token, now + expires_in)
+        logger.debug("token_refreshed", target=target.name, expires_in=expires_in)
+        return token
 
 
 async def create_dataset(

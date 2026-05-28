@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 
 import httpx
@@ -16,6 +17,9 @@ logger = structlog.get_logger(__name__)
 # Suppress httpx request logging — it leaks ClickHouse password in query params
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+# Allowlist for user-supplied column names — no dots, no spaces, no injections
+_SAFE_COL_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 
 def _ch_url(ds: Datasource) -> str:
@@ -43,10 +47,16 @@ async def search_logs_ch(
     trace_type: str | None = None,
     input_hash: str | None = None,
     limit: int = 50,
+    time_field: str | None = None,
 ) -> list[dict]:
     """Full-text search in ClickHouse."""
     if not ds.url:
         return []
+
+    # Resolve time column: validate user-supplied name or fall back to "timestamp"
+    ts_col = "timestamp"
+    if time_field and _SAFE_COL_RE.match(time_field):
+        ts_col = time_field
 
     if is_org_admin and "/" in project_id:
         org = project_id.split("/", 1)[0]
@@ -57,10 +67,10 @@ async def search_logs_ch(
         params = {"project_id": project_id}
 
     if start:
-        conditions.append("timestamp >= {start:String}")
+        conditions.append(f"{ts_col} >= {{start:String}}")
         params["start"] = start.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
     if end:
-        conditions.append("timestamp <= {end:String}")
+        conditions.append(f"{ts_col} <= {{end:String}}")
         params["end"] = end.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3]
     if session_id:
         conditions.append("session_id = {session_id:String}")
@@ -81,10 +91,10 @@ async def search_logs_ch(
 
     where = " AND ".join(conditions)
     sql = f"""
-        SELECT event_id, event_type, timestamp, project_id, model, name, trace_id, session_id, body
+        SELECT event_id, event_type, {ts_col} as timestamp, project_id, model, name, trace_id, session_id, body
         FROM {ds.database}.{ds.table}
         WHERE {where}
-        ORDER BY timestamp DESC
+        ORDER BY {ts_col} DESC
         LIMIT {min(limit, 500)}
         FORMAT JSON
     """

@@ -11,6 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response as StarletteResponse
 
 from dataimporter.config import Settings, get_settings
+from dataimporter.routes.config import router as config_router
 from dataimporter.routes.export import router as export_router
 from dataimporter.routes.logs import router as logs_router
 from dataimporter.routes.media import router as media_router
@@ -40,6 +41,7 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(RequestIDMiddleware)
 
+app.include_router(config_router)
 app.include_router(export_router)
 app.include_router(logs_router)
 app.include_router(media_router)
@@ -80,83 +82,37 @@ async def livez() -> dict:
     return {"status": "ok"}
 
 
-@app.get("/ready")
-async def ready(settings: Settings = Depends(get_settings)):
-    import asyncio
-    import aioboto3
-    import httpx as _httpx
+async def _check_all_datasources(
+    settings: Settings,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Ping every configured datasource; return (components, error_details)."""
+    from dataimporter.adapters import get_adapter
 
+    components: dict[str, str] = {}
+    details: dict[str, str] = {}
     for ds in settings.datasources:
         try:
-            if ds.type == "s3":
-                from dataimporter.s3 import _s3_client_config, _s3_session
-                session = _s3_session(ds)
-                async with session.client("s3", endpoint_url=ds.endpoint, config=_s3_client_config(ds)) as client:
-                    await asyncio.wait_for(client.head_bucket(Bucket=ds.bucket), timeout=3)
-            elif ds.type == "clickhouse" and ds.url:
-                async with _httpx.AsyncClient(timeout=3) as client:
-                    resp = await client.get(f"{ds.url.rstrip('/')}/ping")
-                    resp.raise_for_status()
-            elif ds.type == "trino" and ds.url:
-                async with _httpx.AsyncClient(timeout=3) as client:
-                    resp = await client.get(f"{ds.url.rstrip('/')}/v1/info")
-                    resp.raise_for_status()
-            elif ds.type == "langfuse" and ds.url:
-                from dataimporter.langfuse import ping_langfuse
-                await ping_langfuse(ds)
-            elif ds.type == "chyt" and ds.url:
-                async with _httpx.AsyncClient(timeout=3) as client:
-                    resp = await client.get(f"{ds.url.rstrip('/')}/ping")
-                    resp.raise_for_status()
-        except Exception:
-            return StarletteResponse(status_code=503)
+            await get_adapter(ds).ping()
+            components[ds.name] = "ok"
+        except Exception as exc:
+            components[ds.name] = "degraded"
+            details[ds.name] = str(exc)
+    return components, details
 
+
+@app.get("/ready")
+async def ready(settings: Settings = Depends(get_settings)):
+    components, _ = await _check_all_datasources(settings)
+    if any(v != "ok" for v in components.values()):
+        return StarletteResponse(status_code=503)
     return StarletteResponse(status_code=200)
 
 
 @app.get("/health")
 async def health(settings: Settings = Depends(get_settings)) -> dict:
-    import asyncio
-    import aioboto3
-    import httpx as _httpx
-
-    components: dict[str, str] = {}
-    details: dict[str, str] = {}
-
-    for ds in settings.datasources:
-        try:
-            if ds.type == "s3":
-                from dataimporter.s3 import _s3_client_config, _s3_session
-                session = _s3_session(ds)
-                async with session.client("s3", endpoint_url=ds.endpoint, config=_s3_client_config(ds)) as client:
-                    await asyncio.wait_for(client.head_bucket(Bucket=ds.bucket), timeout=3)
-                components[ds.name] = "ok"
-            elif ds.type == "clickhouse" and ds.url:
-                async with _httpx.AsyncClient(timeout=3) as client:
-                    resp = await client.get(f"{ds.url.rstrip('/')}/ping")
-                    resp.raise_for_status()
-                components[ds.name] = "ok"
-            elif ds.type == "trino" and ds.url:
-                async with _httpx.AsyncClient(timeout=3) as client:
-                    resp = await client.get(f"{ds.url.rstrip('/')}/v1/info")
-                    resp.raise_for_status()
-                components[ds.name] = "ok"
-            elif ds.type == "langfuse" and ds.url:
-                from dataimporter.langfuse import ping_langfuse
-                await ping_langfuse(ds)
-                components[ds.name] = "ok"
-            elif ds.type == "chyt" and ds.url:
-                async with _httpx.AsyncClient(timeout=3) as client:
-                    resp = await client.get(f"{ds.url.rstrip('/')}/ping")
-                    resp.raise_for_status()
-                components[ds.name] = "ok"
-        except Exception as exc:
-            components[ds.name] = "degraded"
-            details[ds.name] = str(exc)
-
+    components, details = await _check_all_datasources(settings)
     enabled = {k: v for k, v in components.items() if v != "disabled"}
     status = "ok" if all(v == "ok" for v in enabled.values()) else "degraded"
-
     result: dict = {"status": status, "components": components}
     if details:
         result["details"] = details

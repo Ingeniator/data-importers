@@ -7,6 +7,7 @@ from typing import Any
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from dataimporter.adapters import get_adapter
 from dataimporter.auth import AuthContext, get_auth
 from dataimporter.config import Datasource, Settings, get_settings
 
@@ -28,17 +29,49 @@ def _infer_type(value: Any) -> str:
     return "string"
 
 
+def _collect_fields(
+    obj: dict,
+    fields: dict[str, dict],
+    prefix: str = "",
+    depth: int = 0,
+    max_depth: int = 3,
+) -> None:
+    """Recursively collect field names, types, and examples into *fields* (mutates it).
+
+    Nested object keys are joined with a dot: ``parent.child.leaf``.
+    """
+    for k, v in obj.items():
+        if k.startswith("_"):
+            continue
+        full_key = f"{prefix}.{k}" if prefix else k
+        inferred = _infer_type(v)
+
+        if full_key not in fields:
+            fields[full_key] = {"type": inferred, "example": None}
+
+        # Record first non-None, non-object example value
+        if fields[full_key]["example"] is None and v is not None:
+            if isinstance(v, dict):
+                pass  # example stays None for objects; sub-fields carry the values
+            elif isinstance(v, list):
+                fields[full_key]["example"] = v[:2] if v else None
+            else:
+                fields[full_key]["example"] = v
+
+        # Recurse into nested dicts up to max_depth
+        if isinstance(v, dict) and depth < max_depth:
+            _collect_fields(v, fields, prefix=full_key, depth=depth + 1, max_depth=max_depth)
+
+
 def _flatten_fields(records: list[dict]) -> dict[str, dict]:
-    """Collect field names, inferred types, and first non-None example from records."""
+    """Collect field names, inferred types, and first non-None example from records.
+
+    Object (dict) fields are expanded recursively using dot-notation keys so that
+    nested structure is visible to callers (e.g. ``"metadata.user_id"``).
+    """
     fields: dict[str, dict] = {}
     for rec in records:
-        for k, v in rec.items():
-            if k.startswith("_"):
-                continue
-            if k not in fields:
-                fields[k] = {"type": _infer_type(v), "example": None}
-            if fields[k]["example"] is None and v is not None and not isinstance(v, dict):
-                fields[k]["example"] = v if not isinstance(v, list) else (v[:2] if v else None)
+        _collect_fields(rec, fields)
     return fields
 
 
@@ -69,62 +102,27 @@ async def datasource_sample(
     if end and end.tzinfo is None:
         end = end.replace(tzinfo=timezone.utc)
 
-    records: list[dict] = []
+    records: list[dict]
 
     if ds.type == "s3":
+        # S3 uses DuckDB to read the first row per file for schema inference —
+        # a different code path from content search.
         if not keys:
             raise HTTPException(status_code=400, detail="keys[] required for S3 datasource")
         import asyncio
         from dataimporter.sampling import read_s3_traces_for_sampling
         records = await asyncio.to_thread(read_s3_traces_for_sampling, keys[:5], ds)
-
-    elif ds.type == "langfuse":
-        from dataimporter.langfuse import search_logs_langfuse
-        records = await search_logs_langfuse(
-            query="*", ds=ds,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=5,
-        )
-
-    elif ds.type == "clickhouse":
-        from dataimporter.clickhouse import search_logs_ch
-        records = await search_logs_ch(
-            query="*", ds=ds,
-            project_id=auth.public_key,
-            is_org_admin=auth.is_org_admin,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=5,
-        )
-
-    elif ds.type == "trino":
-        from dataimporter.trino import search_logs_trino
-        records = await search_logs_trino(
-            query="*", ds=ds,
-            project_id=auth.public_key,
-            is_org_admin=auth.is_org_admin,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=5,
-        )
-
-    elif ds.type == "chyt":
-        from dataimporter.chyt import search_logs_chyt
-        records = await search_logs_chyt(
-            query="*", ds=ds,
-            project_id=auth.public_key,
-            is_org_admin=auth.is_org_admin,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=5,
-        )
-
     else:
-        raise HTTPException(status_code=400, detail=f"Schema discovery not supported for '{ds.type}'")
+        try:
+            adapter = get_adapter(ds)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"Schema discovery not supported for '{ds.type}'")
+        records = await adapter.search(
+            "*", auth=auth,
+            start=start, end=end,
+            session_id=session_id, trace_id=trace_id,
+            trace_type=trace_type, input_hash=input_hash,
+            limit=5,
+        )
 
     return {"fields": _flatten_fields(records), "sample_count": len(records)}

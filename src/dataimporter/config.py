@@ -116,6 +116,7 @@ class ServerConfig:
     silence_probes: bool = True
     hide_auth_inputs: bool = False
     redis_url: str = ""
+    worker_metrics_port: int = 9101
 
 
 @dataclass(frozen=True)
@@ -156,22 +157,29 @@ class Settings:
         return self.datasources[0] if self.datasources else None
 
 
+def _check_unknown_keys(raw: dict, cls: type, entity: str) -> None:
+    known = {f.name for f in cls.__dataclass_fields__.values()}
+    unknown = sorted(set(raw) - known)
+    if unknown:
+        raise ValueError(
+            f"Unknown key(s) in {entity}: {unknown}. "
+            f"Check for typos — valid keys: {sorted(known)}"
+        )
+
+
 def _parse_datasource(raw: dict) -> Datasource:
-    known_fields = {f.name for f in Datasource.__dataclass_fields__.values()}
-    filtered = {k: v for k, v in raw.items() if k in known_fields}
-    return Datasource(**filtered)
+    _check_unknown_keys(raw, Datasource, f"datasource '{raw.get('name', '?')}'")
+    return Datasource(**raw)
 
 
 def _parse_connection(raw: dict) -> Connection:
-    known_fields = {f.name for f in Connection.__dataclass_fields__.values()}
-    filtered = {k: v for k, v in raw.items() if k in known_fields}
-    return Connection(**filtered)
+    _check_unknown_keys(raw, Connection, f"connection '{raw.get('url', '?')}'")
+    return Connection(**raw)
 
 
 def _parse_target(raw: dict) -> DatasetTarget:
-    known_fields = {f.name for f in DatasetTarget.__dataclass_fields__.values()}
-    filtered = {k: v for k, v in raw.items() if k in known_fields}
-    return DatasetTarget(**filtered)
+    _check_unknown_keys(raw, DatasetTarget, f"target '{raw.get('name', '?')}'")
+    return DatasetTarget(**raw)
 
 
 def load_config(path: str | Path) -> Settings:

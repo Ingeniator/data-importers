@@ -9,6 +9,8 @@ from dataimporter.config import get_settings
 
 _pool: ArqRedis | None = None
 
+PROGRESS_KEY = "dataimporter:progress:{job_id}"
+
 
 def is_queue_available() -> bool:
     return bool(get_settings().server.redis_url)

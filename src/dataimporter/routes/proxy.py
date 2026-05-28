@@ -8,11 +8,17 @@ import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from dataimporter.adapters import get_adapter
+from dataimporter.auth import AuthContext
 from dataimporter.config import Datasource, Settings, get_settings
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter()
+
+# Synthetic AuthContext used on the proxy path — credentials belong to the caller,
+# no server-side tenant scoping applies.
+_PROXY_AUTH = AuthContext(public_key="", secret_key="")
 
 
 class UserCredentials(BaseModel):
@@ -98,31 +104,30 @@ async def proxy_search(
 
     limit = min(req.limit, 500)
 
-    if ds.type == "langfuse":
-        from dataimporter.langfuse import search_logs_langfuse
-
-        results = await search_logs_langfuse(
-            query=req.q, ds=ds,
-            start=start, end=end,
-            session_id=req.session_id, trace_id=req.trace_id,
-            trace_type=req.trace_type, input_hash=req.input_hash,
-            limit=limit,
-        )
-        return {"results": results, "backend": "langfuse"}
-
     if ds.type == "s3":
+        # S3 proxy lists objects (no DuckDB content search) — different code path.
         from dataimporter.s3 import list_objects_proxy
-
         results = await list_objects_proxy(
-            ds=ds,
-            start=start, end=end,
+            ds=ds, start=start, end=end,
             session_id=req.session_id, trace_id=req.trace_id,
             trace_type=req.trace_type, input_hash=req.input_hash,
             limit=limit,
         )
         return {"results": results, "backend": "s3"}
 
-    raise HTTPException(status_code=400, detail=f"Proxy search not supported for type '{ds.type}'")
+    try:
+        adapter = get_adapter(ds)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Proxy search not supported for type '{ds.type}'")
+
+    results = await adapter.search(
+        req.q, auth=_PROXY_AUTH,
+        start=start, end=end,
+        session_id=req.session_id, trace_id=req.trace_id,
+        trace_type=req.trace_type, input_hash=req.input_hash,
+        limit=limit,
+    )
+    return {"results": results, "backend": ds.type}
 
 
 @router.post("/api/public/proxy/ping")
@@ -134,14 +139,12 @@ async def proxy_ping(
     ds = _resolve_connection(req.credentials, settings)
 
     try:
-        if ds.type == "langfuse":
-            from dataimporter.langfuse import ping_langfuse
-            await ping_langfuse(ds)
-        elif ds.type == "s3":
-            from dataimporter.s3 import ping_s3
-            await ping_s3(ds)
-        else:
-            raise HTTPException(status_code=400, detail=f"Ping not supported for type '{ds.type}'")
+        adapter = get_adapter(ds)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Ping not supported for type '{ds.type}'")
+
+    try:
+        await adapter.ping()
     except HTTPException:
         raise
     except Exception as e:

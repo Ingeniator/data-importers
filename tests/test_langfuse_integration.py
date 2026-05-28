@@ -15,6 +15,9 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
+import aioboto3
+from botocore.config import Config as BotoConfig
+
 from dataimporter.config import Datasource
 from dataimporter.langfuse import ping_langfuse, search_logs_langfuse
 
@@ -23,10 +26,60 @@ LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY")
 LANGFUSE_SECRET_KEY = os.environ.get("LANGFUSE_SECRET_KEY")
 INGEST_TIMEOUT = float(os.environ.get("LANGFUSE_INGEST_TIMEOUT", "60"))
 
+S3_ENDPOINT = os.environ.get("S3_ENDPOINT")
+S3_ACCESS_KEY_ID = os.environ.get("S3_ACCESS_KEY_ID")
+S3_SECRET_ACCESS_KEY = os.environ.get("S3_SECRET_ACCESS_KEY")
+S3_BUCKET = os.environ.get("S3_BUCKET", "trace-assets")
+
 pytestmark = pytest.mark.skipif(
     not (LANGFUSE_URL and LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY),
     reason="Set LANGFUSE_URL/LANGFUSE_PUBLIC_KEY/LANGFUSE_SECRET_KEY to run",
 )
+
+
+def _s3_client_kwargs(ds: Datasource) -> dict:
+    return dict(
+        endpoint_url=ds.endpoint,
+        aws_access_key_id=ds.access_key_id,
+        aws_secret_access_key=ds.secret_access_key,
+        config=BotoConfig(
+            s3={"addressing_style": ds.addressing_style},
+            signature_version="s3v4",
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
+        ),
+    )
+
+
+async def _upload_asset(key: str, data: bytes, content_type: str, ds: Datasource) -> None:
+    session = aioboto3.Session()
+    async with session.client("s3", **_s3_client_kwargs(ds)) as client:
+        await client.put_object(Bucket=ds.bucket, Key=key, Body=data, ContentType=content_type)
+
+
+async def _presign_asset(key: str, ds: Datasource) -> str:
+    session = aioboto3.Session()
+    async with session.client("s3", **_s3_client_kwargs(ds)) as client:
+        return await client.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": ds.bucket, "Key": key},
+            ExpiresIn=3600,
+        )
+
+
+@pytest.fixture
+def s3_ds() -> Datasource:
+    if not (S3_ENDPOINT and S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY):
+        pytest.skip("Set S3_ENDPOINT/S3_ACCESS_KEY_ID/S3_SECRET_ACCESS_KEY to run")
+    return Datasource(
+        name="minio-it",
+        type="s3",
+        bucket=S3_BUCKET,
+        endpoint=S3_ENDPOINT,
+        access_key_id=S3_ACCESS_KEY_ID or "",
+        secret_access_key=S3_SECRET_ACCESS_KEY or "",
+        addressing_style="path",
+    )
 
 
 @pytest.fixture
@@ -152,3 +205,37 @@ async def test_search_filters_by_session_id(langfuse_ds: Datasource):
     assert await _wait_for(found, INGEST_TIMEOUT), (
         f"session {session_id} not visible within {INGEST_TIMEOUT}s"
     )
+
+
+@pytest.mark.asyncio
+async def test_ingest_trace_with_s3_asset(langfuse_ds: Datasource, s3_ds: Datasource):
+    marker = uuid.uuid4().hex[:12]
+    trace_id = f"trace-asset-{marker}"
+    asset_key = f"test-assets/{trace_id}.txt"
+    asset_data = f"asset content for trace {marker}".encode()
+
+    await _upload_asset(asset_key, asset_data, "text/plain", s3_ds)
+    asset_url = await _presign_asset(asset_key, s3_ds)
+
+    await _ingest_trace(
+        langfuse_ds,
+        trace_id=trace_id,
+        name=f"it-asset-{marker}",
+        body={
+            "input": {"prompt": f"describe asset {marker}"},
+            "output": {"text": "asset described"},
+            "metadata": {"asset_url": asset_url, "asset_key": asset_key},
+        },
+    )
+
+    async def found() -> bool:
+        results = await search_logs_langfuse(query=marker, ds=langfuse_ds, limit=50)
+        return any(r.get("trace_id") == trace_id for r in results)
+
+    assert await _wait_for(found, INGEST_TIMEOUT), (
+        f"trace {trace_id} with asset not searchable within {INGEST_TIMEOUT}s"
+    )
+
+    results = await search_logs_langfuse(query="*", ds=langfuse_ds, trace_id=trace_id, limit=1)
+    assert results, f"trace {trace_id} not fetchable by id"
+    assert results[0]["body"]["metadata"]["asset_key"] == asset_key

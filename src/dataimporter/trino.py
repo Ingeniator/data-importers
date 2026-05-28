@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import datetime
 
 import httpx
@@ -15,6 +16,8 @@ logger = structlog.get_logger(__name__)
 
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+_SAFE_COL_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_]*$")
 
 _POLL_INTERVAL = 0.1  # seconds between polling Trino for results
 
@@ -84,10 +87,15 @@ async def search_logs_trino(
     trace_type: str | None = None,
     input_hash: str | None = None,
     limit: int = 50,
+    time_field: str | None = None,
 ) -> list[dict]:
     """Full-text search in Trino."""
     if not ds.url:
         return []
+
+    ts_col = "timestamp"
+    if time_field and _SAFE_COL_RE.match(time_field):
+        ts_col = time_field
 
     table = f"{ds.catalog}.{ds.schema_name}.{ds.table}" if ds.catalog and ds.schema_name else ds.table
 
@@ -98,9 +106,9 @@ async def search_logs_trino(
         conditions = [f"project_id = '{_esc(project_id)}'"]
 
     if start:
-        conditions.append(f"timestamp >= TIMESTAMP '{start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}'")
+        conditions.append(f"{ts_col} >= TIMESTAMP '{start.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}'")
     if end:
-        conditions.append(f"timestamp <= TIMESTAMP '{end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}'")
+        conditions.append(f"{ts_col} <= TIMESTAMP '{end.strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]}'")
     if session_id:
         conditions.append(f"session_id = '{_esc(session_id)}'")
     if trace_id:
@@ -115,10 +123,10 @@ async def search_logs_trino(
 
     where = " AND ".join(conditions)
     sql = f"""
-        SELECT event_id, event_type, timestamp, project_id, model, name, trace_id, session_id, body
+        SELECT event_id, event_type, {ts_col} AS timestamp, project_id, model, name, trace_id, session_id, body
         FROM {table}
         WHERE {where}
-        ORDER BY timestamp DESC
+        ORDER BY {ts_col} DESC
         LIMIT {min(limit, 500)}
     """
 

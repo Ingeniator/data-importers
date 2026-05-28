@@ -5,6 +5,7 @@ import glob as _glob
 import math
 import os
 import random as _random
+import threading
 from typing import Any
 
 import structlog
@@ -203,31 +204,36 @@ try:
 except Exception:
     _DUCKDB_AVAILABLE = False
 
-_httpfs_installed = False
+# Size-1 connection pool — one shared DuckDB connection, serialised by a lock.
+# S3 credentials are re-applied before every query so swapping datasources works.
+_duckdb_lock = threading.Lock()
+_duckdb_conn: Any = None  # guarded by _duckdb_lock
 
 
-def _duckdb_s3_conn(ds: Any) -> Any:
-    global _httpfs_installed
-    endpoint = (ds.endpoint or "").replace("https://", "").replace("http://", "")
-    use_ssl = (ds.endpoint or "").startswith("https://")
+def _make_duckdb_conn(ds: Any) -> Any:
+    """Create and fully initialise a DuckDB connection with httpfs loaded."""
     os.makedirs(ds.duckdb_temp_dir, exist_ok=True)
     os.environ.setdefault("HOME", ds.duckdb_temp_dir)
     conn = duckdb.connect(":memory:", config={
         "temp_directory": ds.duckdb_temp_dir,
         "home_directory": ds.duckdb_temp_dir,
     })
-    if not _httpfs_installed:
-        conn.install_extension(_HTTPFS_EXT, force_install=True)
-        _httpfs_installed = True
+    conn.install_extension(_HTTPFS_EXT, force_install=True)
     conn.load_extension("httpfs")
+    return conn
+
+
+def _apply_s3_settings(conn: Any, ds: Any) -> None:
+    """(Re-)apply S3 credentials and endpoint on an existing connection."""
+    endpoint = (ds.endpoint or "").replace("https://", "").replace("http://", "")
+    use_ssl = (ds.endpoint or "").startswith("https://")
+    url_style = "vhost" if ds.addressing_style == "virtual" else "path"
     conn.execute(f"SET s3_endpoint = '{endpoint}';")
     conn.execute(f"SET s3_access_key_id = '{ds.access_key_id}';")
     conn.execute(f"SET s3_secret_access_key = '{ds.secret_access_key}';")
     conn.execute(f"SET s3_region = '{ds.region}';")
     conn.execute(f"SET s3_use_ssl = {'true' if use_ssl else 'false'};")
-    url_style = "vhost" if ds.addressing_style == "virtual" else "path"
     conn.execute(f"SET s3_url_style = '{url_style}';")
-    return conn
 
 
 def read_s3_traces_for_sampling(keys: list[str], ds: Any) -> list[dict]:
@@ -239,38 +245,45 @@ def read_s3_traces_for_sampling(keys: list[str], ds: Any) -> list[dict]:
     url_to_key = {u: k for u, k in zip(urls, keys)}
     files_list = ", ".join(f"'{u}'" for u in urls)
 
-    conn = _duckdb_s3_conn(ds)
-    try:
-        sql = f"""
-            SELECT * EXCLUDE (rn)
-            FROM (
-                SELECT *, filename,
-                       ROW_NUMBER() OVER (PARTITION BY filename) AS rn
-                FROM read_json_auto(
-                    [{files_list}],
-                    format='newline_delimited',
-                    ignore_errors=true,
-                    union_by_name=true,
-                    filename=true
+    with _duckdb_lock:
+        global _duckdb_conn
+        if _duckdb_conn is None:
+            _duckdb_conn = _make_duckdb_conn(ds)
+        _apply_s3_settings(_duckdb_conn, ds)
+        try:
+            sql = f"""
+                SELECT * EXCLUDE (rn)
+                FROM (
+                    SELECT *, filename,
+                           ROW_NUMBER() OVER (PARTITION BY filename) AS rn
+                    FROM read_json_auto(
+                        [{files_list}],
+                        format='newline_delimited',
+                        ignore_errors=true,
+                        union_by_name=true,
+                        filename=true
+                    )
                 )
-            )
-            WHERE rn = 1
-        """
-        result = conn.execute(sql)
-        columns = [d[0] for d in result.description]
-        rows = result.fetchall()
-        traces = []
-        for row in rows:
-            d = dict(zip(columns, row))
-            filename = d.pop("filename", "")
-            d["_key"] = url_to_key.get(filename, filename.split(f"{ds.bucket}/", 1)[-1])
-            traces.append(d)
-        return traces
-    except Exception as e:
-        logger.error("s3_sampling_read_failed", error=str(e))
-        return [{"_key": k} for k in keys]
-    finally:
-        conn.close()
+                WHERE rn = 1
+            """
+            result = _duckdb_conn.execute(sql)
+            columns = [d[0] for d in result.description]
+            rows = result.fetchall()
+            traces = []
+            for row in rows:
+                d = dict(zip(columns, row))
+                filename = d.pop("filename", "")
+                d["_key"] = url_to_key.get(filename, filename.split(f"{ds.bucket}/", 1)[-1])
+                traces.append(d)
+            return traces
+        except Exception as e:
+            logger.error("s3_sampling_read_failed", error=str(e))
+            try:
+                _duckdb_conn.close()
+            except Exception:
+                pass
+            _duckdb_conn = None
+            return [{"_key": k} for k in keys]
 
 
 def apply_sampling_s3(

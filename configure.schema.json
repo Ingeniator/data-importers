@@ -1,0 +1,734 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "IngestionConfig": {
+      "description": "Which datasource to read from.",
+      "properties": {
+        "datasource": {
+          "description": "Name of a configured datasource.",
+          "title": "Datasource",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Datasource type (informational; actual type is taken from server config).",
+          "readOnly": true,
+          "title": "Type"
+        }
+      },
+      "required": [
+        "datasource"
+      ],
+      "title": "IngestionConfig",
+      "type": "object"
+    },
+    "FilterRule": {
+      "description": "A single filter predicate applied to a field.",
+      "properties": {
+        "field": {
+          "description": "Dot-notation field path, e.g. ``body.model``.",
+          "title": "Field",
+          "type": "string"
+        },
+        "op": {
+          "description": "Comparison operator.",
+          "enum": [
+            "equals",
+            "not_equals",
+            "in",
+            "not_in",
+            "contains",
+            "not_contains",
+            "starts_with",
+            "greater_than",
+            "less_than",
+            "greater_than_or_equal",
+            "less_than_or_equal",
+            "is_empty",
+            "not_empty",
+            "last",
+            "between"
+          ],
+          "title": "Op",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Comparison value. For ``in`` / ``not_in``: an array of strings. For ``last``: a duration string such as ``7d``, ``24h``, ``1h``. For ``is_empty`` / ``not_empty``: omit.",
+          "title": "Value"
+        },
+        "from": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO-8601 start datetime (op=between).",
+          "title": "From"
+        },
+        "to": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "ISO-8601 end datetime (op=between).",
+          "title": "To"
+        }
+      },
+      "required": [
+        "field",
+        "op"
+      ],
+      "title": "FilterRule",
+      "type": "object",
+      "if": {
+        "properties": {
+          "op": {
+            "const": "between"
+          }
+        }
+      },
+      "then": {
+        "required": ["from", "to"],
+        "properties": {
+          "from": {
+            "type": "string"
+          },
+          "to": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "FiltersConfig": {
+      "description": "Collection of filter rules combined with a logical mode.",
+      "properties": {
+        "mode": {
+          "default": "and",
+          "description": "How rules are combined.",
+          "enum": [
+            "and",
+            "or"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "rules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/FilterRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        }
+      },
+      "title": "FiltersConfig",
+      "type": "object"
+    },
+    "MaskingRule": {
+      "description": "Field-level masking override.",
+      "properties": {
+        "field": {
+          "description": "Dot-notation field path.",
+          "title": "Field",
+          "type": "string"
+        },
+        "action": {
+          "default": "remove",
+          "description": "What to do with the field. ``keep`` explicitly includes a field when ``default_policy`` is ``deny``. ``truncate`` shortens the value to ``max_length`` characters. ``pii_redact`` automatically strips emails, phones, and token-like strings — NOT available in v1.",
+          "enum": [
+            "remove",
+            "hash",
+            "redact",
+            "truncate",
+            "pii_redact",
+            "keep"
+          ],
+          "title": "Action",
+          "type": "string"
+        },
+        "max_length": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 1
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Maximum character length to keep after truncation (action=truncate).",
+          "title": "Max Length"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "MaskingRule",
+      "type": "object",
+      "if": {
+        "properties": {
+          "action": {
+            "const": "truncate"
+          }
+        }
+      },
+      "then": {
+        "required": ["max_length"],
+        "properties": {
+          "max_length": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    "MaskingConfig": {
+      "description": "Controls which fields are included in the export.\n\nWhen ``default_policy`` is ``deny``, only fields listed in ``allow_fields``\nare kept; individual ``rules`` can further override per-field behaviour.",
+      "properties": {
+        "default_policy": {
+          "default": "allow",
+          "description": "``allow`` — export all fields unless explicitly blocked. ``deny``  — export only fields listed in ``allow_fields``.",
+          "enum": [
+            "allow",
+            "deny"
+          ],
+          "title": "Default Policy",
+          "type": "string"
+        },
+        "allow_fields": {
+          "default": [],
+          "description": "Dot-notation paths to always include (relevant when default_policy=deny).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Allow Fields",
+          "type": "array"
+        },
+        "rules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/MaskingRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        }
+      },
+      "title": "MaskingConfig",
+      "type": "object"
+    },
+    "SamplingStrategy": {
+      "title": "SamplingStrategy",
+      "description": "Available sampling strategies.",
+      "type": "string",
+      "enum": [
+        "random",
+        "high_cost",
+        "latency_spike",
+        "long_trace",
+        "failure",
+        "user_dissatisfaction",
+        "business_critical",
+        "prompt_version_change",
+        "low_confidence",
+        "weird_tool_sequences",
+        "hybrid"
+      ]
+    },
+    "SamplingRule": {
+      "description": "One sampling strategy with its inclusion rate.",
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/SamplingStrategy",
+          "description": "Which sampling strategy to apply.",
+          "title": "Type"
+        },
+        "rate": {
+          "description": "Fraction of qualifying traces to include (0.0 – 1.0).",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Rate",
+          "type": "number"
+        },
+        "field": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Source field used by the strategy (e.g. ``cost_usd`` for high_cost, ``latency_ms`` for latency_spike).",
+          "title": "Field"
+        },
+        "params": {
+          "additionalProperties": true,
+          "default": {},
+          "description": "Strategy-specific tuning parameters. Common keys: ``percentile`` (0–100 float) for high_cost/latency_spike; ``threshold`` (numeric) for absolute cutoffs; ``window`` (duration string, e.g. ``1h``) for time-bounded strategies.",
+          "title": "Params",
+          "type": "object"
+        }
+      },
+      "required": [
+        "type",
+        "rate"
+      ],
+      "title": "SamplingRule",
+      "type": "object"
+    },
+    "SamplingConfig": {
+      "description": "Sampling configuration applied before the export.",
+      "properties": {
+        "strategy": {
+          "$ref": "#/$defs/SamplingStrategy",
+          "default": "random",
+          "description": "Top-level strategy label. Use ``hybrid`` when multiple rules are defined.",
+          "title": "Strategy"
+        },
+        "strict_schema": {
+          "default": false,
+          "description": "Drop traces whose schema does not match ``schema_snapshot``.",
+          "title": "Strict Schema",
+          "type": "boolean"
+        },
+        "schema_snapshot": {
+          "anyOf": [
+            {
+              "type": "object",
+              "additionalProperties": true
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Reference schema to compare against when ``strict_schema`` is true. Traces deviating from this structure are dropped.",
+          "title": "Schema Snapshot"
+        },
+        "max_traces": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hard cap on the total number of traces exported.",
+          "title": "Max Traces"
+        },
+        "rules": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SamplingRule"
+          },
+          "title": "Rules",
+          "type": "array"
+        }
+      },
+      "title": "SamplingConfig",
+      "type": "object",
+      "if": {
+        "properties": {
+          "strategy": {
+            "const": "hybrid"
+          }
+        }
+      },
+      "then": {
+        "required": ["rules"],
+        "properties": {
+          "rules": {
+            "minItems": 1
+          }
+        }
+      }
+    },
+    "AssetSource": {
+      "description": "A field that may contain asset references.",
+      "properties": {
+        "field": {
+          "description": "Dot-notation field path that holds asset references.",
+          "title": "Field",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field"
+      ],
+      "title": "AssetSource",
+      "type": "object"
+    },
+    "AssetResolutionConfig": {
+      "$defs": {
+        "AssetFilter": {
+          "description": "A rejection predicate evaluated against each discovered asset.",
+          "properties": {
+            "reject_if": {
+              "description": "Expression string, e.g. ``asset.size_mb > 20`` or ``asset.mime_type not_in [image/png, image/jpeg]``.",
+              "title": "Reject If",
+              "type": "string"
+            }
+          },
+          "required": [
+            "reject_if"
+          ],
+          "title": "AssetFilter",
+          "type": "object"
+        }
+      },
+      "description": "Configuration for finding and exporting referenced binary assets.",
+      "properties": {
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "sources": {
+          "default": [],
+          "description": "Fields to scan for asset references.",
+          "items": {
+            "$ref": "#/$defs/AssetSource"
+          },
+          "title": "Sources",
+          "type": "array"
+        },
+        "check_availability": {
+          "default": false,
+          "description": "HEAD-check each asset URL before including it.",
+          "title": "Check Availability",
+          "type": "boolean"
+        },
+        "fetch_mode": {
+          "default": "metadata_only",
+          "description": "``metadata_only`` — record URL/size/mime, do not download bytes. ``full`` — download asset content into the export dataset.",
+          "enum": [
+            "metadata_only",
+            "full"
+          ],
+          "title": "Fetch Mode",
+          "type": "string"
+        },
+        "filters": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/AssetResolutionConfig/$defs/AssetFilter"
+          },
+          "title": "Filters",
+          "type": "array"
+        },
+        "deduplicate_by": {
+          "default": [],
+          "description": "Asset attributes used to deduplicate (e.g. ``asset.sha256``).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Deduplicate By",
+          "type": "array"
+        }
+      },
+      "title": "AssetResolutionConfig",
+      "type": "object"
+    },
+    "DestinationConfig": {
+      "description": "Where the exported dataset is written to.",
+      "properties": {
+        "datasource": {
+          "description": "Name of a configured destination target (matches server-side target name).",
+          "title": "Datasource",
+          "type": "string"
+        },
+        "type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Destination type (informational; actual type is taken from server config).",
+          "readOnly": true,
+          "title": "Type"
+        },
+        "dataset_name": {
+          "description": "Name for the dataset created in the destination service.",
+          "title": "Dataset Name",
+          "type": "string"
+        },
+        "access": {
+          "default": "organization",
+          "description": "Access level for the created dataset.",
+          "enum": [
+            "organization",
+            "private"
+          ],
+          "title": "Access",
+          "type": "string"
+        },
+        "dataset_type": {
+          "default": "DATASET",
+          "description": "Dataset type classification passed to the destination service.",
+          "enum": [
+            "DATASET",
+            "EXPERIMENT"
+          ],
+          "title": "Dataset Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "datasource",
+        "dataset_name"
+      ],
+      "title": "DestinationConfig",
+      "type": "object"
+    },
+    "ScheduleConfig": {
+      "description": "Recurring execution schedule for the export job.",
+      "properties": {
+        "cron": {
+          "description": "Cron expression defining when the job runs, e.g. ``0 9 * * 1`` (every Monday at 09:00).",
+          "title": "Cron",
+          "type": "string"
+        },
+        "timezone": {
+          "default": "UTC",
+          "description": "IANA timezone name used to interpret the cron expression, e.g. ``Europe/Berlin``.",
+          "title": "Timezone",
+          "type": "string"
+        },
+        "enabled": {
+          "default": true,
+          "description": "Set to false to pause the schedule without removing it.",
+          "title": "Enabled",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cron"
+      ],
+      "title": "ScheduleConfig",
+      "type": "object"
+    },
+    "WebhookConfig": {
+      "description": "HTTP callback fired when the export job completes.",
+      "properties": {
+        "url": {
+          "description": "Endpoint to POST the completion payload to.",
+          "title": "URL",
+          "type": "string",
+          "format": "uri"
+        },
+        "headers": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {},
+          "description": "Extra HTTP headers to include in the request (e.g. Authorization).",
+          "title": "Headers",
+          "type": "object"
+        },
+        "secret": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "If set, the request body is signed with HMAC-SHA256 and the signature is sent in the ``X-Signature-SHA256`` header.",
+          "title": "Secret"
+        },
+        "timeout_seconds": {
+          "default": 30,
+          "description": "Seconds to wait for a response before giving up.",
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "url"
+      ],
+      "title": "WebhookConfig",
+      "type": "object"
+    }
+  },
+  "description": "Top-level schema for a dataimporter export-job configuration YAML.\n\nAll sections are optional — omit those not relevant to your export.",
+  "properties": {
+    "ingestion": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/IngestionConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "filters": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/FiltersConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "masking": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MaskingConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "sampling": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SamplingConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "asset_resolution": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/AssetResolutionConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "destination": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DestinationConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "webhook": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WebhookConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schedule": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ScheduleConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "title": "JobConfig",
+  "type": "object",
+  "examples": [
+    {
+      "ingestion": {
+        "datasource": "prod-logs"
+      },
+      "filters": {
+        "mode": "and",
+        "rules": [
+          {"field": "body.model", "op": "equals", "value": "gpt-4o"},
+          {"field": "created_at", "op": "last", "value": "7d"}
+        ]
+      },
+      "masking": {
+        "default_policy": "allow",
+        "rules": [
+          {"field": "body.messages", "action": "redact"},
+          {"field": "user_id", "action": "hash"}
+        ]
+      },
+      "sampling": {
+        "strategy": "hybrid",
+        "max_traces": 5000,
+        "rules": [
+          {"type": "failure", "rate": 1.0},
+          {"type": "high_cost", "rate": 0.5, "field": "cost_usd", "params": {"percentile": 90}},
+          {"type": "random", "rate": 0.05}
+        ]
+      },
+      "destination": {
+        "datasource": "my-dataset"
+      },
+      "webhook": {
+        "url": "https://example.com/hooks/export-done"
+      }
+    }
+  ]
+}

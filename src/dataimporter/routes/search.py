@@ -1,4 +1,4 @@
-"""Full-text search endpoint — supports duckdb (over S3) and clickhouse backends."""
+"""Full-text search endpoint — dispatches to the datasource adapter."""
 
 from __future__ import annotations
 
@@ -7,8 +7,10 @@ from datetime import datetime, timezone
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from dataimporter.adapters import get_adapter
 from dataimporter.auth import AuthContext, get_auth
 from dataimporter.config import Datasource, Settings, get_settings
+from dataimporter.filters import apply_filters, parse_filters
 
 logger = structlog.get_logger(__name__)
 
@@ -35,6 +37,8 @@ async def search(
     trace_type: str | None = Query(default=None),
     input_hash: str | None = Query(default=None),
     limit: int = Query(default=50, le=500),
+    filters: str | None = Query(default=None),
+    time_field: str | None = Query(default=None),
     ds: Datasource = Depends(_resolve_datasource),
     auth: AuthContext = Depends(get_auth),
 ) -> dict:
@@ -43,83 +47,22 @@ async def search(
     if end and end.tzinfo is None:
         end = end.replace(tzinfo=timezone.utc)
 
-    if ds.type == "clickhouse":
-        from dataimporter.clickhouse import search_logs_ch
+    filter_rules = parse_filters(filters)
 
-        results = await search_logs_ch(
-            query=q,
-            project_id=auth.public_key,
-            is_org_admin=auth.is_org_admin,
-            ds=ds,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=limit,
-        )
-        return {"results": results, "backend": "clickhouse"}
+    try:
+        adapter = get_adapter(ds)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Search not supported for datasource type '{ds.type}'")
 
-    if ds.type == "trino":
-        from dataimporter.trino import search_logs_trino
+    results = await adapter.search(
+        q, auth=auth,
+        start=start, end=end,
+        session_id=session_id, trace_id=trace_id,
+        trace_type=trace_type, input_hash=input_hash,
+        limit=limit, time_field=time_field,
+    )
 
-        results = await search_logs_trino(
-            query=q,
-            project_id=auth.public_key,
-            is_org_admin=auth.is_org_admin,
-            ds=ds,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=limit,
-        )
-        return {"results": results, "backend": "trino"}
+    if filter_rules:
+        results = apply_filters(results, filter_rules)
 
-    if ds.type == "s3":
-        from dataimporter.s3 import list_batch_keys
-        from dataimporter.search import search_logs
-
-        keys_meta = await list_batch_keys(
-            auth, ds, start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-        )
-        keys = [f["key"] for f in keys_meta]
-
-        logger.info("search_scope", query=q, backend="duckdb", files=len(keys))
-
-        if not keys:
-            return {"results": [], "files_scanned": 0, "backend": "duckdb"}
-
-        import asyncio
-        results = await asyncio.to_thread(search_logs, keys, q, ds, limit)
-
-        return {"results": results, "files_scanned": len(keys), "keys": keys, "backend": "duckdb"}
-
-    if ds.type == "langfuse":
-        from dataimporter.langfuse import search_logs_langfuse
-
-        results = await search_logs_langfuse(
-            query=q,
-            ds=ds,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=limit,
-        )
-        return {"results": results, "backend": "langfuse"}
-
-    if ds.type == "chyt":
-        from dataimporter.chyt import search_logs_chyt
-
-        results = await search_logs_chyt(
-            query=q,
-            project_id=auth.public_key,
-            is_org_admin=auth.is_org_admin,
-            ds=ds,
-            start=start, end=end,
-            session_id=session_id, trace_id=trace_id,
-            trace_type=trace_type, input_hash=input_hash,
-            limit=limit,
-        )
-        return {"results": results, "backend": "chyt"}
-
-    raise HTTPException(status_code=400, detail=f"Search not supported for datasource type '{ds.type}'")
+    return {"results": results, "backend": ds.type}

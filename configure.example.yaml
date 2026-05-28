@@ -1,0 +1,61 @@
+ingestion:
+  datasource: <name>
+  type: S3
+filters:
+  mode: and
+  rules:
+  - field: cost_usd
+    op: greater_than
+    value: 0.05
+  - field: created_at
+    op: last
+    value: "7d"
+masking:
+  default_policy: deny
+  allow_fields:
+  - trace.id
+  - trace.name
+  - trace.timestamp
+  - trace.metadata.agent_version
+  - trace.scores
+  rules:
+  - field: trace.input.password
+    action: remove
+sampling:
+  strategy: hybrid
+  rules:
+  - type: random
+    rate: 0.2
+  - type: high_cost
+    rate: 0.1
+  - type: failure
+    rate: 1.0
+asset_resolution:
+  enabled: true
+  sources:
+  - field: trace.attachments
+  - field: observation.metadata.files
+  check_availability: true
+  fetch_mode: full
+  deduplicate_by:
+  - asset.sha256
+  filters:
+  - reject_if: asset.size_mb > 20
+  - reject_if: asset.mime_type not_in [image/png, image/jpeg]
+  - reject_if: asset.download_status != ok
+destination:
+  datasource: my-dataset
+  type: dataset
+  dataset_name: prod-export-2024
+  access: organization
+  dataset_type: DATASET
+webhook:
+  url: https://example.com/hooks/export-done
+  headers:
+    Authorization: Bearer <token>
+  secret: <signing-secret>
+  timeout_seconds: 30
+schedule:
+  cron: "0 9 * * 1"
+  timezone: Europe/Berlin
+  enabled: true

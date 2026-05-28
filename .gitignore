@@ -1,3 +1,8 @@
 src/dataimporter/**/__pycache__/*
 *.pyc
 docs/tasks-feature-questions.md
+src/dataimporter/__pycache__/clickhouse.cpython-313.pyc
+src/dataimporter/__pycache__/config.cpython-313.pyc
+src/dataimporter/__pycache__/main.cpython-313.pyc
+src/dataimporter/__pycache__/s3.cpython-313.pyc
+src/dataimporter/__pycache__/trino.cpython-313.pyc

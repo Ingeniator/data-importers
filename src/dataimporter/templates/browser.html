@@ -147,6 +147,44 @@
   .progress-label { font-size: .8rem; color: #555; display: flex; justify-content: space-between; }
   .progress-dataset { margin-top: 12px; font-size: .85rem; }
   .progress-dataset a { color: #2563eb; word-break: break-all; }
+
+  /* Schema bar */
+  .schema-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: .83rem;
+                padding: 8px 14px; border-radius: 6px; margin-bottom: 6px; border: 1px solid #e5e7eb;
+                background: #f9fafb; color: #374151; }
+  .schema-bar.detecting { color: #6b7280; }
+  .schema-bar.ready     { background: #f0fdf4; border-color: #bbf7d0; color: #166534; }
+  .schema-bar.error     { background: #fff1f2; border-color: #fecdd3; color: #991b1b; }
+  .schema-bar.nodata    { background: #fffbeb; border-color: #fde68a; color: #92400e; }
+  .schema-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .schema-dot.detecting { background: #9ca3af; animation: schemapulse 1.2s ease-in-out infinite; }
+  .schema-dot.ready     { background: #22c55e; }
+  .schema-dot.error     { background: #ef4444; }
+  .schema-dot.nodata    { background: #f59e0b; }
+  @keyframes schemapulse { 0%,100%{opacity:.4} 50%{opacity:1} }
+  .schema-actions { display: flex; gap: 6px; margin-left: auto; }
+  .cp-btn { background: #fff; border: 1px solid #d1d5db; border-radius: 4px; padding: 3px 10px;
+            font-size: .78rem; font-weight: 500; cursor: pointer; color: #374151; line-height: 1.4; }
+  .cp-btn:hover { border-color: #9ca3af; background: #f3f4f6; }
+  .cp-btn.active { border-color: #2563eb; color: #2563eb; background: #eff6ff; }
+
+  /* Column picker panel */
+  .col-picker { background: #fff; border: 1px solid #e5e7eb; border-radius: 8px;
+                box-shadow: 0 4px 16px rgba(0,0,0,.1); margin-bottom: 10px;
+                display: flex; flex-direction: column; max-height: 340px; overflow: hidden; }
+  .col-picker-header { padding: 10px 14px; border-bottom: 1px solid #f3f4f6;
+                       display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+  .col-picker-header span { font-size: .85rem; font-weight: 600; color: #374151; }
+  .col-picker-list { overflow-y: auto; padding: 4px 0; }
+  .col-picker-item { display: flex; align-items: center; gap: 8px; padding: 5px 14px;
+                     cursor: pointer; user-select: none; }
+  .col-picker-item:hover { background: #f9fafb; }
+  .col-picker-item input[type=checkbox] { cursor: pointer; margin: 0; flex-shrink: 0; accent-color: #2563eb; }
+  .col-picker-name { flex: 1; font-family: monospace; font-size: .8rem; color: #1e293b; }
+  .col-picker-type { font-size: .7rem; color: #9ca3af; background: #f3f4f6;
+                     padding: 1px 5px; border-radius: 3px; flex-shrink: 0; }
+  .col-picker-ex   { font-size: .72rem; color: #9ca3af; max-width: 120px;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -203,6 +241,9 @@
   <div class="actions" id="actionButtons"></div>
 </div>
 
+<div id="schemaBar" class="schema-bar" style="display:none"></div>
+<div id="colPicker" class="col-picker" style="display:none"></div>
+
 <div id="status"></div>
 
 <div class="card" id="results" style="display:none">
@@ -227,6 +268,12 @@ let currentEvents = [];
 let currentSearchKeys = [];
 let timePreset = '24h';
 let customFrom = null, customTo = null;
+
+// ── Schema / column state ──
+let _schemaCache = {};      // dsName → { fields, defaultColumns, visibleColumns }
+let _schemaDetecting = {};  // dsName → true (dedup guard)
+let _colPickerOpen = false;
+const LS_COLS_KEY = 'dataimporter_columns_v1';
 
 const PRESETS = {
   '15m': 15*60*1000, '1h': 60*60*1000, '4h': 4*60*60*1000,
@@ -269,9 +316,379 @@ function getTimeRange() {
   return { start: new Date(now - ms).toISOString(), end: now.toISOString() };
 }
 document.addEventListener('click', e => {
-  const picker = document.getElementById('timePicker');
-  if (!picker.contains(e.target)) document.getElementById('timeDropdown').classList.remove('open');
+  const timePicker = document.getElementById('timePicker');
+  if (!timePicker.contains(e.target)) document.getElementById('timeDropdown').classList.remove('open');
+
+  // Close column picker when clicking outside the schema bar + picker area
+  if (_colPickerOpen) {
+    const bar = document.getElementById('schemaBar');
+    const cp  = document.getElementById('colPicker');
+    if (bar && cp && !bar.contains(e.target) && !cp.contains(e.target))
+      closeColumnPicker();
+  }
 });
+
+// ══════════════════════════════════════════
+//  Schema persistence (localStorage)
+// ══════════════════════════════════════════
+
+function _saveColumns(dsName, cols) {
+  try {
+    const stored = JSON.parse(localStorage.getItem(LS_COLS_KEY) || '{}');
+    stored[dsName] = cols;
+    localStorage.setItem(LS_COLS_KEY, JSON.stringify(stored));
+  } catch {}
+}
+
+function _loadColumns(dsName) {
+  try { return JSON.parse(localStorage.getItem(LS_COLS_KEY) || '{}')[dsName] || null; }
+  catch { return null; }
+}
+
+// ══════════════════════════════════════════
+//  Schema helpers
+// ══════════════════════════════════════════
+
+/** Return only leaf fields — fields that have no children (dot-path descendants). */
+function _leafFields(fields) {
+  const keys = Object.keys(fields);
+  return keys.filter(k => !keys.some(o => o !== k && o.startsWith(k + '.')));
+}
+
+/** Pick up to 6 default columns: timestamp/time first, then *_id fields, then rest.
+ *  Skip fields whose example is null (proxy for "mostly empty in sample").
+ */
+function _computeDefaultColumns(fields) {
+  const leaves = _leafFields(fields);
+  const nonNull = leaves.filter(k => fields[k].example !== null);
+  const pool = nonNull.length >= 2 ? nonNull : leaves;
+
+  const tsRe = /^(timestamp|time|ts|created_at|created|date|datetime|at)$/i;
+  const idRe = /^(id|trace_id|session_id|request_id|span_id|run_id|conversation_id)$/i;
+  const getName = k => k.split('.').pop();
+
+  const p1 = pool.filter(k => tsRe.test(getName(k)));
+  const p2 = pool.filter(k => idRe.test(getName(k)) && !p1.includes(k));
+  const rest = pool.filter(k => !p1.includes(k) && !p2.includes(k));
+
+  return [...p1, ...p2, ...rest].slice(0, 6);
+}
+
+/** Store schema into cache, preserving any previously-saved column selection. */
+function _storeSchema(dsName, fields) {
+  const defaults = _computeDefaultColumns(fields);
+  const saved = _loadColumns(dsName);
+  const inMem = _schemaCache[dsName] ? _schemaCache[dsName].visibleColumns : null;
+
+  // Prefer saved (localStorage), fall back to in-memory, fall back to computed defaults.
+  // Validate: keep only columns that actually exist in the new fields.
+  const validate = cols => cols ? cols.filter(c => fields[c] !== undefined) : null;
+  const validSaved  = validate(saved);
+  const validInMem  = validate(inMem);
+  const toUse = (validSaved  && validSaved.length)  ? validSaved  :
+                (validInMem  && validInMem.length)   ? validInMem  :
+                [...defaults];
+
+  _schemaCache[dsName] = { fields, defaultColumns: defaults, visibleColumns: toUse };
+}
+
+/** Build a schema object from records entirely on the client (used as fallback). */
+function _deriveSchemaFromRecords(records) {
+  const fields = {};
+  function collect(obj, prefix, depth) {
+    if (!obj || typeof obj !== 'object' || Array.isArray(obj) || depth > 3) return;
+    for (const [k, v] of Object.entries(obj)) {
+      if (k.startsWith('_')) continue;
+      const key = prefix ? prefix + '.' + k : k;
+      let type = 'string';
+      if      (v === null || v === undefined)          type = 'string';
+      else if (typeof v === 'boolean')                 type = 'bool';
+      else if (Array.isArray(v))                       type = 'list';
+      else if (typeof v === 'object')                  type = 'object';
+      else if (typeof v === 'number' && Number.isInteger(v)) type = 'int';
+      else if (typeof v === 'number')                  type = 'float';
+
+      if (!fields[key]) fields[key] = { type, example: null };
+      if (fields[key].example === null && v != null) {
+        if (typeof v !== 'object')      fields[key].example = v;
+        else if (Array.isArray(v))      fields[key].example = v.slice(0, 2);
+      }
+      if (typeof v === 'object' && v !== null && !Array.isArray(v))
+        collect(v, key, depth + 1);
+    }
+  }
+  records.forEach(r => { if (r && typeof r === 'object') collect(r, '', 0); });
+  return fields;
+}
+
+// ══════════════════════════════════════════
+//  Schema detection (hybrid: fires on tab select)
+// ══════════════════════════════════════════
+
+async function _detectSchema(ds, force = false) {
+  const name = ds.name;
+  if (!force && _schemaCache[name]) { _setSchemaBarStatus('ready'); return; }
+  if (_schemaDetecting[name] && !force) return;
+
+  _schemaDetecting[name] = true;
+  _setSchemaBarStatus('detecting');
+
+  try {
+    let fields;
+    const auth = authHeader();
+
+    if (ds._user) {
+      // User-defined connection: proxy search for a few records, derive client-side
+      const data = await proxySearch('*', 5);
+      fields = _deriveSchemaFromRecords(data.results || []);
+
+    } else if (ds.type === 's3') {
+      // S3 needs keys first: list recent files, then sample their contents
+      const lp = new URLSearchParams({ datasource: name });
+      const now = new Date();
+      lp.set('start', new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString());
+      lp.set('end', now.toISOString());
+      const lr = await fetch(BASE + '/api/public/logs/list?' + lp, { headers: { Authorization: auth } });
+      if (!lr.ok) throw new Error('list failed: ' + lr.status);
+      const ld = await lr.json();
+      const keys = (ld.files || []).slice(0, 5).map(f => f.key);
+      if (!keys.length) { _setSchemaBarStatus('nodata'); return; }
+
+      const sp = new URLSearchParams({ datasource: name });
+      keys.forEach(k => sp.append('keys', k));
+      const sr = await fetch(BASE + '/api/public/datasource/sample?' + sp, { headers: { Authorization: auth } });
+      if (!sr.ok) throw new Error('sample failed: ' + sr.status);
+      fields = (await sr.json()).fields;
+
+    } else {
+      // ClickHouse / Trino / Langfuse / CHYT: direct sample call
+      const sp = new URLSearchParams({ datasource: name });
+      const now = new Date();
+      sp.set('start', new Date(now - 24 * 60 * 60 * 1000).toISOString());
+      sp.set('end', now.toISOString());
+      const r = await fetch(BASE + '/api/public/datasource/sample?' + sp, { headers: { Authorization: auth } });
+      if (!r.ok) throw new Error('sample failed: ' + r.status);
+      fields = (await r.json()).fields;
+    }
+
+    // Bail out if the user switched away before we finished
+    if (!activeDs || activeDs.name !== name) return;
+
+    _storeSchema(name, fields);
+    _setSchemaBarStatus('ready');
+
+    // If search results are already on screen, re-render with proper schema
+    if (currentEvents.length) renderDynamicTable(currentEvents);
+
+  } catch (e) {
+    if (!activeDs || activeDs.name !== name) return;
+    _setSchemaBarStatus('error', e.message);
+  } finally {
+    delete _schemaDetecting[name];
+  }
+}
+
+// ══════════════════════════════════════════
+//  Schema bar UI
+// ══════════════════════════════════════════
+
+function _setSchemaBarStatus(status, msg) {
+  const bar = document.getElementById('schemaBar');
+  if (!bar) return;
+  const dsName = activeDs ? activeDs.name : '';
+  bar.style.display = '';
+
+  if (status === 'detecting') {
+    bar.className = 'schema-bar detecting';
+    bar.innerHTML =
+      '<span class="schema-dot detecting"></span>' +
+      'Detecting schema from <b>' + esc(dsName) + '</b>…';
+
+  } else if (status === 'ready') {
+    const schema = _schemaCache[dsName];
+    const nLeaf = schema ? _leafFields(schema.fields).length : 0;
+    bar.className = 'schema-bar ready';
+    bar.innerHTML =
+      '<span class="schema-dot ready"></span>' +
+      '<span><b>' + nLeaf + '</b> fields detected from <b>' + esc(dsName) + '</b></span>' +
+      '<span class="schema-actions">' +
+        '<button class="cp-btn" id="cpToggleBtn" onclick="toggleColumnPicker()">⚙ Columns ▾</button>' +
+        '<button class="cp-btn" onclick="_detectSchema(activeDs, true)" title="Re-sample schema">↺</button>' +
+      '</span>';
+
+  } else if (status === 'error') {
+    bar.className = 'schema-bar error';
+    bar.innerHTML =
+      '<span class="schema-dot error"></span>' +
+      '<span>Schema detection failed' + (msg ? ': ' + esc(msg) : '') + '</span>' +
+      '<span class="schema-actions">' +
+        '<button class="cp-btn" onclick="_detectSchema(activeDs, true)">Retry</button>' +
+      '</span>';
+
+  } else if (status === 'nodata') {
+    bar.className = 'schema-bar nodata';
+    bar.innerHTML =
+      '<span class="schema-dot nodata"></span>' +
+      'No data found in last 7 days — schema will be inferred after first search';
+  }
+}
+
+// ══════════════════════════════════════════
+//  Column picker
+// ══════════════════════════════════════════
+
+function toggleColumnPicker() {
+  _colPickerOpen ? closeColumnPicker() : openColumnPicker();
+}
+
+function openColumnPicker() {
+  _colPickerOpen = true;
+  _renderColumnPicker();
+  const el = document.getElementById('colPicker');
+  if (el) el.style.display = '';
+  const btn = document.getElementById('cpToggleBtn');
+  if (btn) { btn.textContent = '⚙ Columns ▲'; btn.classList.add('active'); }
+}
+
+function closeColumnPicker() {
+  _colPickerOpen = false;
+  const el = document.getElementById('colPicker');
+  if (el) el.style.display = 'none';
+  const btn = document.getElementById('cpToggleBtn');
+  if (btn) { btn.textContent = '⚙ Columns ▾'; btn.classList.remove('active'); }
+}
+
+function _renderColumnPicker() {
+  const schema = activeDs && _schemaCache[activeDs.name];
+  if (!schema) return;
+  const leaves = _leafFields(schema.fields);
+  const visible = new Set(schema.visibleColumns);
+
+  const items = leaves.map(f => {
+    const info = schema.fields[f];
+    const ex = info.example !== null ? String(info.example).substring(0, 28) : '';
+    const safeF = f.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+    return '<label class="col-picker-item">' +
+      '<input type="checkbox"' + (visible.has(f) ? ' checked' : '') +
+        ' onchange="toggleColumn(\'' + safeF + '\', this.checked)">' +
+      '<span class="col-picker-name">' + esc(f) + '</span>' +
+      '<span class="col-picker-type">' + esc(info.type) + '</span>' +
+      (ex ? '<span class="col-picker-ex" title="' + esc(String(info.example)) + '">' + esc(ex) + '</span>' : '') +
+    '</label>';
+  }).join('');
+
+  document.getElementById('colPicker').innerHTML =
+    '<div class="col-picker-header">' +
+      '<span>Visible columns <span style="font-weight:400;color:#9ca3af;font-size:.78rem">' +
+        visible.size + ' / ' + leaves.length + ' fields</span></span>' +
+      '<button class="btn-secondary btn-sm" onclick="resetToDefaultColumns()">Reset defaults</button>' +
+    '</div>' +
+    '<div class="col-picker-list">' + items + '</div>';
+}
+
+function toggleColumn(field, checked) {
+  const schema = activeDs && _schemaCache[activeDs.name];
+  if (!schema) return;
+  if (checked) {
+    if (!schema.visibleColumns.includes(field)) schema.visibleColumns.push(field);
+  } else {
+    schema.visibleColumns = schema.visibleColumns.filter(f => f !== field);
+  }
+  _saveColumns(activeDs.name, schema.visibleColumns);
+  _renderColumnPicker();  // refresh checkbox counts
+  if (currentEvents.length) renderDynamicTable(currentEvents);
+}
+
+function resetToDefaultColumns() {
+  const schema = activeDs && _schemaCache[activeDs.name];
+  if (!schema) return;
+  schema.visibleColumns = [...schema.defaultColumns];
+  _saveColumns(activeDs.name, schema.visibleColumns);
+  _renderColumnPicker();
+  if (currentEvents.length) renderDynamicTable(currentEvents);
+}
+
+// ══════════════════════════════════════════
+//  Dynamic table renderer
+// ══════════════════════════════════════════
+
+function _getNestedValue(obj, path) {
+  let curr = obj;
+  for (const key of path.split('.')) {
+    if (curr == null || typeof curr !== 'object') return undefined;
+    curr = curr[key];
+  }
+  return curr;
+}
+
+function _renderCellValue(v) {
+  if (v === undefined || v === null) return '<span style="color:#d1d5db">—</span>';
+  if (typeof v === 'boolean') return String(v);
+  if (typeof v === 'object') {
+    const s = JSON.stringify(v);
+    return esc(s.length > 60 ? s.substring(0, 58) + '…' : s);
+  }
+  const s = String(v);
+  return esc(s.length > 80 ? s.substring(0, 78) + '…' : s);
+}
+
+function renderDynamicTable(records) {
+  const schema = activeDs && _schemaCache[activeDs.name];
+  let cols;
+
+  if (schema && schema.visibleColumns && schema.visibleColumns.length) {
+    cols = schema.visibleColumns;
+  } else {
+    // Schema not ready yet — derive client-side and store
+    const derived = _deriveSchemaFromRecords(records);
+    if (Object.keys(derived).length && activeDs) {
+      _storeSchema(activeDs.name, derived);
+      cols = _schemaCache[activeDs.name].visibleColumns;
+      _setSchemaBarStatus('ready');
+    } else {
+      // Last resort: top-level keys
+      cols = Object.keys(records[0] || {}).filter(k => !k.startsWith('_')).slice(0, 6);
+    }
+  }
+
+  // Disambiguate header labels: if two columns share a last segment, show full path
+  const lastSegs = cols.map(c => c.split('.').pop());
+  const colHeaders = cols.map((c, i) => {
+    const label = lastSegs.filter((s, j) => s === lastSegs[i] && j !== i).length > 0 ? c : lastSegs[i];
+    return '<th title="' + esc(c) + '" style="white-space:nowrap">' + esc(label) + '</th>';
+  }).join('');
+
+  document.getElementById('thead').innerHTML =
+    '<tr><th><input type="checkbox" id="selectAll" onchange="toggleAll(this)"></th>' +
+    colHeaders + '<th></th></tr>';
+
+  const tbody = document.getElementById('tbody');
+  tbody.innerHTML = '';
+  document.getElementById('results').style.display = records.length ? '' : 'none';
+
+  const importBtnEv = targets.length
+    ? '<button class="btn-secondary" onclick="showImportModal(\'events\')">Import to dataset service</button>'
+    : '';
+  document.getElementById('resultActions').innerHTML =
+    '<button class="btn-primary" onclick="downloadEventsJson()">Download catalog</button>' +
+    '<button class="btn-secondary" onclick="downloadEventsJsonl()">Download JSONL</button>' +
+    '<button class="btn-secondary" onclick="exportEventsDataset()">Export as dataset</button>' +
+    importBtnEv;
+
+  records.forEach((ev, i) => {
+    const cells = cols.map(c => {
+      const v = _getNestedValue(ev, c);
+      const raw = (v != null && typeof v === 'object') ? JSON.stringify(v) : (v != null ? String(v) : '');
+      return '<td class="truncate" title="' + esc(raw.substring(0, 300)) + '">' + _renderCellValue(v) + '</td>';
+    }).join('');
+    const tr = document.createElement('tr');
+    tr.innerHTML =
+      '<td><input type="checkbox" class="sel" data-idx="' + i + '"></td>' +
+      cells +
+      '<td><button class="btn-secondary btn-sm" onclick="previewEvent(' + i + ')">Preview</button></td>';
+    tbody.appendChild(tr);
+  });
+}
 
 // ── Auth ──
 function authHeader() {
@@ -532,9 +949,13 @@ function selectDatasource(ds) {
   document.getElementById('urls').innerHTML = '';
   currentEvents = [];
   currentSearchKeys = [];
+  // Close column picker when switching tabs
+  closeColumnPicker();
   // Show filters
   document.getElementById('filtersCard').style.display = '';
   renderFilters();
+  // Fire schema detection immediately (hybrid: runs in background while user sets filters)
+  _detectSchema(ds);
 }
 
 function renderFilters() {
@@ -645,7 +1066,7 @@ async function searchEvents() {
       renderFilesTable(currentEvents);
       status.textContent = currentEvents.length + ' batch(es) found [' + activeDs.name + ' / s3]';
     } else {
-      renderEventsTable(currentEvents);
+      renderDynamicTable(currentEvents);
       status.textContent = currentEvents.length + ' event(s) found [' + activeDs.name + ' / ' + (data.backend || activeDs.type) + ']';
     }
   } catch (e) { status.textContent = 'Error: ' + e.message; }
@@ -673,7 +1094,7 @@ async function listEvents() {
       renderFilesTable(currentEvents);
       status.textContent = currentEvents.length + ' batch(es) [' + activeDs.name + ' / s3]';
     } else {
-      renderEventsTable(currentEvents);
+      renderDynamicTable(currentEvents);
       status.textContent = currentEvents.length + ' event(s) [' + activeDs.name + ' / ' + (data.backend || activeDs.type) + ']';
     }
   } catch (e) { status.textContent = 'Error: ' + e.message; }
@@ -722,7 +1143,7 @@ async function fullTextSearch() {
     const data = await resp.json();
     currentEvents = data.results;
     currentSearchKeys = data.keys || [];
-    renderEventsTable(currentEvents);
+    renderDynamicTable(currentEvents);
     status.textContent = data.results.length + ' result(s) across ' + (data.files_scanned || '?') + ' file(s) [' + activeDs.name + ' / duckdb]';
   } catch (e) { status.textContent = 'Error: ' + e.message; }
 }
