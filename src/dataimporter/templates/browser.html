@@ -1,284 +1,553 @@
 <!DOCTYPE html>
-<html lang="en" data-base="{{ base_path }}">
+<html class="light" lang="en" data-base="{{ base_path }}">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>dataimporter</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif:wght@400;700&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      colors: {
+        "background": "#faf9fa",
+        "surface": "#faf9fa",
+        "surface-bright": "#faf9fa",
+        "surface-dim": "#dbdadb",
+        "surface-container-lowest": "#ffffff",
+        "surface-container-low": "#f5f3f4",
+        "surface-container": "#efedee",
+        "surface-container-high": "#e9e8e9",
+        "surface-container-highest": "#e3e2e3",
+        "surface-variant": "#e3e2e3",
+        "on-surface": "#1b1c1d",
+        "on-surface-variant": "#434653",
+        "on-background": "#1b1c1d",
+        "primary": "#094cb2",
+        "primary-container": "#3366cc",
+        "primary-fixed": "#d9e2ff",
+        "primary-fixed-dim": "#b1c5ff",
+        "inverse-primary": "#b1c5ff",
+        "on-primary": "#ffffff",
+        "on-primary-fixed": "#001946",
+        "on-primary-fixed-variant": "#00419d",
+        "on-primary-container": "#e7ebff",
+        "secondary": "#5a5f63",
+        "secondary-container": "#dfe3e8",
+        "secondary-fixed": "#dfe3e8",
+        "secondary-fixed-dim": "#c2c7cc",
+        "on-secondary": "#ffffff",
+        "on-secondary-container": "#606569",
+        "on-secondary-fixed": "#171c20",
+        "on-secondary-fixed-variant": "#42474b",
+        "tertiary": "#6d5e00",
+        "tertiary-container": "#bfab49",
+        "tertiary-fixed": "#f9e37a",
+        "tertiary-fixed-dim": "#dcc661",
+        "on-tertiary": "#ffffff",
+        "on-tertiary-container": "#4a3f00",
+        "on-tertiary-fixed": "#211b00",
+        "on-tertiary-fixed-variant": "#524600",
+        "error": "#ba1a1a",
+        "error-container": "#ffdad6",
+        "on-error": "#ffffff",
+        "on-error-container": "#93000a",
+        "outline": "#737784",
+        "outline-variant": "#c3c6d5",
+        "inverse-surface": "#303031",
+        "inverse-on-surface": "#f2f0f1",
+        "surface-tint": "#2259bf",
+      },
+      fontFamily: {
+        headline: ["Noto Serif", "serif"],
+        display: ["Noto Serif", "serif"],
+        body: ["Inter", "sans-serif"],
+        label: ["Public Sans", "sans-serif"],
+      },
+      borderRadius: {
+        DEFAULT: "0.125rem",
+        lg: "0.25rem",
+        xl: "0.5rem",
+        "2xl": "1rem",
+        full: "0.75rem",
+      },
+    },
+  },
+}
+</script>
 <link rel="stylesheet" href="{{ base_path }}/static/browser.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js" crossorigin="anonymous"></script>
+<style>
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  /* Reset browser.css globals that conflict with the new layout */
+  body { padding: 0 !important; background: #faf9fa !important; }
+  h1.hidden-title { display: none; }
+  /* ds-tabs: strip the border-bottom since the parent container owns it */
+  #dsTabs.ds-tabs { border-bottom: none !important; margin-bottom: 0 !important; }
+</style>
 </head>
-<body>
-<h1>dataimporter</h1>
+<body class="bg-background text-on-surface font-body selection:bg-primary-fixed selection:text-on-primary-fixed">
 
-<div class="card" id="authCard">
-  <div class="row">
-    <div><label>Public Key</label><input type="text" id="pk" placeholder="pk-..."></div>
-    <div><label>Secret Key</label><input type="text" id="sk" placeholder="sk-..."></div>
-  </div>
-</div>
+<div class="flex flex-col min-h-screen">
 
-<!-- Datasource tabs -->
-<div class="ds-tabs" id="dsTabs"></div>
+  <!-- Top App Bar -->
+  <header class="sticky top-0 z-30 bg-surface-container-lowest shadow-sm border-b border-outline-variant/15 flex items-center justify-between px-6 py-3">
+    <nav class="flex gap-6 items-center" data-testid="top-nav">
+      <a href="#" data-testid="nav-datasources" class="text-primary font-label font-bold border-b-2 border-primary pb-0.5 transition-colors">Datasources</a>
+      <a href="#" data-testid="nav-connections" class="text-on-surface-variant font-label font-medium hover:text-primary transition-colors duration-200">Connections</a>
+      <a href="#" data-testid="nav-jobs" class="text-on-surface-variant font-label font-medium hover:text-primary transition-colors duration-200 flex items-center gap-1.5">
+        Jobs
+        <span id="nav-jobs-badge" data-testid="nav-jobs-badge" style="display:none"
+          class="text-[9px] font-label font-bold bg-primary text-on-primary rounded-full px-1.5 py-0.5 leading-none"></span>
+      </a>
+    </nav>
+  </header>
 
-<!-- Filters (shown when a datasource is selected) -->
-<div class="card" id="filtersCard" style="display:none">
-  <div class="search-row">
-    <!-- Time group: field selector + range picker on one line -->
-    <div class="time-group">
-      <div class="time-group-header">
-        <label style="margin:0">Range</label>
-        <select id="timeFieldSel" class="time-field-sel" title="Field used for time filtering"
-                onchange="setTimeField(this.value)" style="display:none">
-          <option value="">— off —</option>
-        </select>
+  <h1 class="hidden-title">dataimporter</h1>
+
+  <!-- Auth credentials bar -->
+  <div id="authCard" class="bg-surface-container-lowest border-b border-outline-variant/10 px-8 py-3">
+    <div class="max-w-[1600px] mx-auto flex gap-4 flex-wrap items-end">
+      <div class="flex flex-col gap-1">
+        <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Public Key</label>
+        <input type="text" id="pk" placeholder="pk-..."
+          class="px-3 py-2 bg-surface-container-low border border-outline-variant/30 rounded-lg text-sm font-mono w-52 focus:outline-none focus:border-primary/60 transition-colors">
       </div>
-      <div id="timePickerWrap">
-        <div class="time-picker" id="timePicker">
-          <button type="button" class="time-btn" onclick="toggleTimeDropdown()">
-            <span id="timeLabel">Last 24 hours</span>
-            <span class="arrow">&#9660;</span>
-          </button>
-          <div class="time-dropdown" id="timeDropdown">
-            <div class="time-presets" id="timePresets">
-              <div onclick="setPreset('15m','Last 15 minutes')">Last 15 minutes</div>
-              <div onclick="setPreset('1h','Last 1 hour')">Last 1 hour</div>
-              <div onclick="setPreset('4h','Last 4 hours')">Last 4 hours</div>
-              <div class="active" onclick="setPreset('24h','Last 24 hours')">Last 24 hours</div>
-              <div onclick="setPreset('7d','Last 7 days')">Last 7 days</div>
-              <div onclick="setPreset('30d','Last 30 days')">Last 30 days</div>
-              <div onclick="setPreset('all','All time')">All time</div>
-            </div>
-            <div class="time-custom">
-              <label>From</label>
-              <input type="datetime-local" id="time_from">
-              <label>To</label>
-              <input type="datetime-local" id="time_to">
-              <button class="btn-primary btn-sm" onclick="applyCustomRange()">Apply</button>
-            </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Secret Key</label>
+        <input type="text" id="sk" placeholder="sk-..."
+          class="px-3 py-2 bg-surface-container-low border border-outline-variant/30 rounded-lg text-sm font-mono w-52 focus:outline-none focus:border-primary/60 transition-colors">
+      </div>
+    </div>
+  </div>
+
+  <!-- Main scrollable content -->
+  <main class="flex-1 overflow-y-auto no-scrollbar">
+
+    <!-- Datasource Tabs Bar -->
+    <div class="bg-surface-container-low px-8 pt-4 border-b border-outline-variant/15">
+      <div class="max-w-[1600px] mx-auto flex items-end justify-between">
+        <div id="dsTabs" class="ds-tabs flex items-end gap-1"></div>
+        <div class="pb-3 flex gap-4 items-center" id="ds_status_bar" style="display:none!important; display:flex">
+          <div class="flex flex-col items-end">
+            <span class="text-[10px] font-label text-on-surface-variant uppercase tracking-widest leading-none">Status</span>
           </div>
         </div>
       </div>
     </div>
-    <!-- Search input with info badge -->
-    <div class="search-group">
-      <label>Search <span id="searchInfoBadge" class="search-badge" style="display:none"></span></label>
-      <input type="text" id="f_query" placeholder="Search inside content...">
-    </div>
-  </div>
 
-  <!-- Backend filter builder (hidden for S3 file-list mode) -->
-  <div id="filterToggleArea" style="display:none">
-    <div class="samp-toggle" style="align-items:center">
-      <button type="button" id="filter_toggle_btn" onclick="toggleFilters()">⚗ Add filters ▼</button>
-      <div class="filter-mode-toggle" id="filter_mode_toggle" style="display:none">
-        <button class="filter-mode-btn active" id="fm_and" onclick="_setFilterMode('and')">AND</button>
-        <button class="filter-mode-btn" id="fm_or" onclick="_setFilterMode('or')">OR</button>
-      </div>
-    </div>
-    <div id="filter_panel" class="samp-panel" style="display:none">
-      <div id="filter_rules"></div>
-      <div class="filter-add-row">
-        <select id="filter_field_sel" style="flex:2;min-width:120px">
-          <option value="">— field —</option>
-        </select>
-        <select id="filter_op_sel" onchange="_onFilterOpChange(this)">
-          <option value="contains">contains</option>
-          <option value="eq">equals</option>
-          <option value="neq">not equals</option>
-          <option value="not_contains">not contains</option>
-          <option value="starts_with">starts with</option>
-          <option value="in">in</option>
-          <option value="not_in">not in</option>
-          <option value="gt">&gt;</option>
-          <option value="lt">&lt;</option>
-          <option value="gte">&gt;=</option>
-          <option value="lte">&lt;=</option>
-          <option value="is_null">is empty</option>
-          <option value="not_null">not empty</option>
-        </select>
-        <input type="text" id="filter_val_inp" placeholder="value…">
-        <button class="btn-secondary btn-sm" onclick="addFilterRule()">+ Add</button>
-      </div>
-    </div>
-  </div>
+    <div class="p-8 space-y-6 max-w-[1600px] mx-auto">
 
-  <div class="actions" id="actionButtons"></div>
-</div>
-
-<div id="schemaBar" class="schema-bar" style="display:none"></div>
-<div id="colPicker" class="col-picker" style="display:none"></div>
-
-<div id="status"></div>
-
-<div class="card" id="results" style="display:none">
-  <table>
-    <thead id="thead"></thead>
-    <tbody id="tbody"></tbody>
-  </table>
-  <div class="actions" id="resultActions"></div>
-  <div id="urls"></div>
-</div>
-
-<!-- Export panel — always visible when a datasource is selected -->
-<div class="card" id="exportCard" style="display:none">
-  <div class="samp-toggle" style="margin-top:0">
-    <button type="button" id="samp_btn" onclick="toggleSampling()">⚗ Sampling ▼</button>
-  </div>
-  <div id="samp_panel" class="samp-panel" style="display:none;margin-top:10px">
-    <div id="samp_schema_area"><span style="color:#aaa;font-size:.78rem">Click to load schema</span></div>
-    <div id="samp_options" style="display:none">
-      <label class="samp-strict"><input type="checkbox" id="samp_strict"> Ignore traces with mismatched structure</label>
-      <div class="samp-max"><label>Max traces</label><input type="number" id="samp_max_traces" placeholder="no limit" min="1" style="width:100px"></div>
-      <div class="samp-rules" id="samp_rules"></div>
-      <div class="samp-add-row">
-        <select id="samp_strat_select"></select>
-        <button class="btn-secondary btn-sm" onclick="addSampRule()">+ Add strategy</button>
-      </div>
-      <div id="samp_yield" class="samp-yield" style="display:none"></div>
-    </div>
-  </div>
-  <div class="export-options">
-    <label class="export-opt-label">
-      <input type="checkbox" id="exp_col_mask" onchange="_expColMask=this.checked">
-      <div class="export-opt-text">
-        <span class="export-opt-title">Use column filter as dataset mask</span>
-        <span class="export-opt-desc">Export only the fields currently visible in the table (from the column picker)</span>
-      </div>
-    </label>
-    <!-- Masking rules builder -->
-    <div class="mask-rules-section" id="mask_rules_section">
-      <div style="font-size:.8rem;font-weight:600;color:#374151;margin-bottom:6px">Field masking rules</div>
-      <div id="mask_rules"></div>
-      <div class="mask-add-row">
-        <input type="text" id="mask_field_inp" placeholder="field.path">
-        <select id="mask_action_sel" onchange="_onMaskActionChange(this)">
-          <option value="remove">remove</option>
-          <option value="hash">hash</option>
-          <option value="redact">redact</option>
-          <option value="truncate">truncate</option>
-          <option value="keep">keep</option>
-        </select>
-        <input type="number" id="mask_maxlen_inp" placeholder="max len" min="1" style="width:80px;display:none">
-        <button class="btn-secondary btn-sm" onclick="addMaskRule()">+ Add</button>
-      </div>
-    </div>
-
-    <label class="export-opt-label">
-      <input type="checkbox" id="exp_asset_resolve" onchange="_expAssetResolve=this.checked;_toggleAssetPanel(this.checked)">
-      <div class="export-opt-text">
-        <span class="export-opt-title">Enable asset resolution</span>
-        <span class="export-opt-desc">Find any referenced assets (images, files, URLs) and export them as a separate dataset</span>
-      </div>
-    </label>
-    <!-- Asset resolution expanded options -->
-    <div id="asset_panel" class="asset-panel" style="display:none">
-      <div>
-        <label>Source fields <span class="hint">(dot-notation paths that hold asset references)</span></label>
-        <div class="asset-tag-list" id="asset_sources_list"></div>
-        <div style="display:flex;gap:6px;margin-top:4px">
-          <input type="text" id="asset_src_inp" placeholder="e.g. trace.attachments" style="flex:1;padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem">
-          <button class="btn-secondary btn-sm" onclick="_addAssetSource()">+ Add</button>
+      <!-- Refine Dataset ─ wraps filtersCard -->
+      <div id="filtersCard" style="display:none" class="bg-surface-container-low rounded-2xl p-6 shadow-sm border border-outline-variant/10">
+        <div class="flex items-center justify-between mb-5">
+          <h3 class="font-headline text-lg font-bold">Refine Dataset</h3>
         </div>
-      </div>
-      <div>
-        <label>Fetch mode</label>
-        <select id="asset_fetch_mode" onchange="_assetFetchMode=this.value" style="width:100%;padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem">
-          <option value="metadata_only">metadata_only — record URL/size/mime only</option>
-          <option value="full">full — download content into export</option>
-        </select>
-      </div>
-      <div class="cfg-toggle">
-        <input type="checkbox" id="asset_check_avail" onchange="_assetCheckAvail=this.checked">
-        <label for="asset_check_avail" style="font-weight:400">HEAD-check each asset URL before including it</label>
-      </div>
-    </div>
-  </div>
 
-  <!-- Destination -->
-  <div class="cfg-section" id="dest_section">
-    <div class="cfg-section-title">Destination</div>
-    <div class="cfg-field">
-      <label>Target</label>
-      <select id="dest_target" onchange="_destTarget=this.value">
-        <option value="">— select target —</option>
-      </select>
-    </div>
-    <div class="cfg-field">
-      <label>Dataset name</label>
-      <input type="text" id="dest_dataset_name" placeholder="my-export-2024" oninput="_destDatasetName=this.value">
-    </div>
-    <div style="display:flex;gap:10px">
-      <div class="cfg-field" style="flex:1">
-        <label>Access</label>
-        <select id="dest_access" onchange="_destAccess=this.value">
-          <option value="organization">organization</option>
-          <option value="private">private</option>
-        </select>
-      </div>
-      <div class="cfg-field" style="flex:1">
-        <label>Dataset type</label>
-        <select id="dest_dataset_type" onchange="_destDatasetType=this.value">
-          <option value="DATASET">DATASET</option>
-          <option value="EXPERIMENT">EXPERIMENT</option>
-        </select>
-      </div>
-    </div>
-  </div>
+        <!-- Schema bar + column picker (JS-populated) -->
+        <div id="schemaBar" class="schema-bar" style="display:none"></div>
+        <div id="colPicker" class="col-picker" style="display:none" data-testid="column-picker-panel"></div>
 
-  <!-- Webhook -->
-  <div class="cfg-section">
-    <div class="cfg-section-title">Webhook <span style="font-size:.72rem;font-weight:400;color:#9ca3af;text-transform:none;letter-spacing:0">— notified on job completion</span></div>
-    <div class="cfg-field">
-      <label>URL</label>
-      <input type="text" id="webhook_url" placeholder="https://example.com/hooks/done" oninput="_webhookUrl=this.value">
-    </div>
-    <div class="cfg-field">
-      <label>Headers <span class="hint">(key: value, one per line)</span></label>
-      <textarea id="webhook_headers" rows="2" oninput="_webhookHeadersRaw=this.value"
-        style="width:100%;padding:6px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem;font-family:monospace;resize:vertical"
-        placeholder="Authorization: Bearer token"></textarea>
-    </div>
-    <div style="display:flex;gap:10px">
-      <div class="cfg-field" style="flex:1">
-        <label>Secret <span class="hint">(HMAC signing)</span></label>
-        <input type="text" id="webhook_secret" placeholder="optional" oninput="_webhookSecret=this.value">
-      </div>
-      <div class="cfg-field" style="width:110px">
-        <label>Timeout (s)</label>
-        <input type="number" id="webhook_timeout" value="30" min="1" max="300" oninput="_webhookTimeout=parseInt(this.value)||30">
-      </div>
-    </div>
-  </div>
+        <!-- Filters inner panel -->
+        <div class="bg-surface-container-lowest/50 rounded-xl border border-outline-variant/15 p-4 mt-2">
+          <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-end">
 
-  <!-- Schedule -->
-  <div class="cfg-section">
-    <div class="cfg-section-title">Schedule</div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <div class="cfg-field" style="flex:2;min-width:150px">
-        <label>Cron expression</label>
-        <input type="text" id="schedule_cron" placeholder="0 9 * * 1" oninput="_scheduleCron=this.value">
-        <div class="hint">minute hour day month weekday</div>
-      </div>
-      <div class="cfg-field" style="flex:1;min-width:130px">
-        <label>Timezone</label>
-        <input type="text" id="schedule_tz" placeholder="UTC" value="UTC" oninput="_scheduleTz=this.value">
-      </div>
-    </div>
-    <div class="cfg-toggle">
-      <input type="checkbox" id="schedule_enabled" checked onchange="_scheduleEnabled=this.checked">
-      <label for="schedule_enabled" style="font-weight:400">Enabled</label>
-    </div>
-  </div>
+            <!-- Time range -->
+            <div class="lg:col-span-4 space-y-2">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Range</span>
+                <select id="timeFieldSel" class="time-field-sel text-[9px] font-label px-2 py-0.5 rounded border border-outline-variant/30 bg-primary-fixed/30 text-on-primary-fixed-variant font-bold uppercase tracking-widest cursor-pointer"
+                        title="Field used for time filtering" onchange="setTimeField(this.value)" style="display:none">
+                  <option value="">— off —</option>
+                </select>
+              </div>
+              <div id="timePickerWrap">
+                <div class="time-picker" id="timePicker">
+                  <button type="button" class="time-btn" onclick="toggleTimeDropdown()" data-testid="time-range-btn">
+                    <span id="timeLabel">Last 24 hours</span>
+                    <span class="arrow">&#9660;</span>
+                  </button>
+                  <div class="time-dropdown" id="timeDropdown" data-testid="time-range-dropdown">
+                    <div class="time-presets" id="timePresets">
+                      <div onclick="setPreset('15m','Last 15 minutes')" data-testid="time-preset-15m">Last 15 minutes</div>
+                      <div onclick="setPreset('1h','Last 1 hour')" data-testid="time-preset-1h">Last 1 hour</div>
+                      <div onclick="setPreset('4h','Last 4 hours')" data-testid="time-preset-4h">Last 4 hours</div>
+                      <div class="active" onclick="setPreset('24h','Last 24 hours')" data-testid="time-preset-24h">Last 24 hours</div>
+                      <div onclick="setPreset('7d','Last 7 days')" data-testid="time-preset-7d">Last 7 days</div>
+                      <div onclick="setPreset('30d','Last 30 days')" data-testid="time-preset-30d">Last 30 days</div>
+                      <div onclick="setPreset('all','All time')" data-testid="time-preset-all">All time</div>
+                    </div>
+                    <div class="time-custom">
+                      <label>From</label>
+                      <input type="datetime-local" id="time_from" data-testid="time-from">
+                      <label>To</label>
+                      <input type="datetime-local" id="time_to" data-testid="time-to">
+                      <button class="btn-primary btn-sm" onclick="applyCustomRange()" data-testid="apply-time-range-btn">Apply</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-  <div class="actions">
-    <button class="btn-secondary btn-sm" onclick="downloadConfigYaml()" title="Download current configuration as YAML">⬇ Config YAML</button>
-    <label class="btn-secondary btn-sm" style="cursor:pointer;margin:0;display:inline-flex;align-items:center" title="Upload a saved configuration YAML">
-      ⬆ Config YAML
-      <input type="file" id="yamlFileInput" accept=".yaml,.yml" style="display:none" onchange="_onYamlFileSelected(this)">
-    </label>
-    <button class="btn-primary" onclick="showExportModal(_sampMode)">Export ▼</button>
-  </div>
+            <!-- Search -->
+            <div class="lg:col-span-8 space-y-2">
+              <label class="block text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">
+                Search
+                <span id="searchInfoBadge" class="search-badge ml-1" style="display:none"></span>
+              </label>
+              <div class="relative flex items-center group">
+                <span class="absolute left-3 material-symbols-outlined text-outline-variant text-lg pointer-events-none group-focus-within:text-primary transition-colors">search</span>
+                <input type="text" id="f_query" data-testid="search-input" placeholder="Search inside content..."
+                  class="w-full pl-10 pr-4 py-2.5 bg-surface-container-lowest border border-outline-variant/30 rounded-lg text-sm font-mono placeholder:font-body placeholder:text-on-surface-variant/40 focus:border-primary focus:ring-0 focus:outline-none transition-all">
+              </div>
+            </div>
+          </div>
+
+          <!-- Filter builder -->
+          <div id="filterToggleArea" style="display:none" class="mt-4 pt-4 border-t border-outline-variant/10">
+            <div class="flex items-center gap-3">
+              <button type="button" id="filter_toggle_btn" onclick="toggleFilters()" data-testid="filter-toggle-btn"
+                class="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant border border-outline-variant/30 rounded-lg hover:border-primary/40 hover:text-primary transition-all">
+                <span class="material-symbols-outlined text-[15px]">filter_alt</span> Add Filters
+              </button>
+              <div class="filter-mode-toggle" id="filter_mode_toggle" style="display:none">
+                <button class="filter-mode-btn active" id="fm_and" onclick="_setFilterMode('and')" data-testid="filter-mode-and">AND</button>
+                <button class="filter-mode-btn" id="fm_or" onclick="_setFilterMode('or')" data-testid="filter-mode-or">OR</button>
+              </div>
+            </div>
+            <div id="filter_panel" class="samp-panel mt-3" style="display:none" data-testid="filter-panel">
+              <div id="filter_rules"></div>
+              <div class="filter-add-row">
+                <select id="filter_field_sel" data-testid="filter-field-sel" style="flex:2;min-width:120px">
+                  <option value="">— field —</option>
+                </select>
+                <select id="filter_op_sel" onchange="_onFilterOpChange(this)" data-testid="filter-op-sel">
+                  <option value="contains">contains</option>
+                  <option value="eq">equals</option>
+                  <option value="neq">not equals</option>
+                  <option value="not_contains">not contains</option>
+                  <option value="starts_with">starts with</option>
+                  <option value="in">in</option>
+                  <option value="not_in">not in</option>
+                  <option value="gt">&gt;</option>
+                  <option value="lt">&lt;</option>
+                  <option value="gte">&gt;=</option>
+                  <option value="lte">&lt;=</option>
+                  <option value="is_null">is empty</option>
+                  <option value="not_null">not empty</option>
+                </select>
+                <input type="text" id="filter_val_inp" data-testid="filter-val-input" placeholder="value…">
+                <button class="btn-secondary btn-sm" onclick="addFilterRule()" data-testid="filter-add-btn">+ Add</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Action buttons (Search / Load) -->
+        <div class="actions mt-4" id="actionButtons"></div>
+      </div>
+
+      <!-- Status line -->
+      <div id="status" class="text-sm text-on-surface-variant font-label px-1"></div>
+
+      <!-- Data Preview -->
+      <section id="results" style="display:none"
+        class="bg-surface-container-lowest rounded-2xl flex flex-col border border-outline-variant/15 overflow-hidden shadow-sm">
+        <div class="p-4 border-b border-outline-variant/10 flex justify-between items-center bg-surface-container-lowest">
+          <h3 class="font-headline font-bold">Data Preview</h3>
+          <div class="actions" id="resultActions"></div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse" data-testid="results-table">
+            <thead id="thead"></thead>
+            <tbody id="tbody" class="text-xs font-mono"></tbody>
+          </table>
+        </div>
+        <div id="urls" class="p-3 border-t border-outline-variant/5 text-xs font-label text-on-surface-variant"></div>
+      </section>
+
+      <!-- Export Card ─ sampling, masking, destination, webhook, schedule -->
+      <div id="exportCard" style="display:none" class="space-y-6">
+
+        <!-- Sampling + Masking side-by-side -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <!-- Sampling Strategy -->
+          <section class="bg-surface-container rounded-2xl p-6 border border-outline-variant/10 shadow-sm">
+            <div class="flex items-center gap-3 mb-5">
+              <span class="material-symbols-outlined text-primary text-xl">percent</span>
+              <h3 class="font-headline font-bold">Sampling</h3>
+            </div>
+            <button type="button" id="samp_btn" onclick="toggleSampling()" data-testid="sampling-toggle-btn"
+              class="flex items-center gap-1.5 px-3 py-1.5 mb-4 text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant border border-outline-variant/30 rounded-lg hover:border-primary/40 hover:text-primary transition-all">
+              <span class="material-symbols-outlined text-[15px]">tune</span> Configure Sampling
+            </button>
+            <div id="samp_panel" class="samp-panel" style="display:none" data-testid="sampling-panel">
+              <div id="samp_schema_area">
+                <span class="text-[11px] text-on-surface-variant/60 italic">Click to load schema</span>
+              </div>
+              <div id="samp_options" style="display:none">
+                <label class="samp-strict">
+                  <input type="checkbox" id="samp_strict" data-testid="sampling-strict-checkbox"> Ignore traces with mismatched structure
+                </label>
+                <div class="samp-max">
+                  <label>Max traces</label>
+                  <input type="number" id="samp_max_traces" data-testid="sampling-max-traces" placeholder="no limit" min="1" style="width:100px">
+                </div>
+                <div class="samp-rules" id="samp_rules"></div>
+                <div class="samp-add-row">
+                  <select id="samp_strat_select" data-testid="sampling-strategy-sel"></select>
+                  <button class="btn-secondary btn-sm" onclick="addSampRule()" data-testid="sampling-add-strategy-btn">+ Add strategy</button>
+                </div>
+                <div id="samp_yield" class="samp-yield" style="display:none" data-testid="sampling-yield-estimate"></div>
+              </div>
+            </div>
+          </section>
+
+          <!-- Data Masking -->
+          <section class="bg-surface-container rounded-2xl p-6 border border-outline-variant/10 shadow-sm">
+            <div class="flex items-center gap-3 mb-5">
+              <span class="material-symbols-outlined text-primary text-xl">security</span>
+              <h3 class="font-headline font-bold">Data Masking</h3>
+            </div>
+            <div class="space-y-4">
+              <label class="export-opt-label">
+                <input type="checkbox" id="exp_col_mask" onchange="_expColMask=this.checked" data-testid="export-col-mask-checkbox">
+                <div class="export-opt-text">
+                  <span class="export-opt-title">Use column filter as dataset mask</span>
+                  <span class="export-opt-desc">Export only the fields currently visible in the column picker</span>
+                </div>
+              </label>
+              <div class="mask-rules-section" id="mask_rules_section">
+                <div class="text-[10px] font-label font-bold text-on-surface-variant uppercase tracking-widest mb-3">Field masking rules</div>
+                <div id="mask_rules"></div>
+                <div class="mask-add-row">
+                  <input type="text" id="mask_field_inp" placeholder="field.path">
+                  <select id="mask_action_sel" onchange="_onMaskActionChange(this)">
+                    <option value="remove">remove</option>
+                    <option value="hash">hash</option>
+                    <option value="redact">redact</option>
+                    <option value="truncate">truncate</option>
+                    <option value="keep">keep</option>
+                  </select>
+                  <input type="number" id="mask_maxlen_inp" placeholder="max len" min="1" style="width:80px;display:none">
+                  <button class="btn-secondary btn-sm" onclick="addMaskRule()">+ Add</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <!-- Export & Destination -->
+        <section class="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/15 shadow-sm">
+          <div class="flex items-center gap-4 mb-8">
+            <div class="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary border border-outline-variant/10 flex-shrink-0">
+              <span class="material-symbols-outlined text-3xl" style="font-variation-settings:'FILL' 1">output</span>
+            </div>
+            <div>
+              <h3 class="font-headline text-xl font-bold">Export &amp; Destination</h3>
+              <p class="text-sm text-on-surface-variant">Configure asset resolution and destination sinks.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+
+            <!-- Asset Resolution -->
+            <div class="space-y-4">
+              <h4 class="font-headline text-base font-bold">Asset Resolution</h4>
+              <label class="export-opt-label">
+                <input type="checkbox" id="exp_asset_resolve" onchange="_expAssetResolve=this.checked;_toggleAssetPanel(this.checked)">
+                <div class="export-opt-text">
+                  <span class="export-opt-title">Enable asset resolution</span>
+                  <span class="export-opt-desc">Find any referenced assets (images, files, URLs) and export as a separate dataset</span>
+                </div>
+              </label>
+              <div id="asset_panel" class="asset-panel" style="display:none">
+                <div>
+                  <label>Source fields <span class="hint">(dot-notation paths that hold asset references)</span></label>
+                  <div class="asset-tag-list" id="asset_sources_list"></div>
+                  <div style="display:flex;gap:6px;margin-top:4px">
+                    <input type="text" id="asset_src_inp" placeholder="e.g. trace.attachments"
+                      style="flex:1;padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem">
+                    <button class="btn-secondary btn-sm" onclick="_addAssetSource()">+ Add</button>
+                  </div>
+                </div>
+                <div>
+                  <label>Fetch mode</label>
+                  <select id="asset_fetch_mode" onchange="_assetFetchMode=this.value"
+                    style="width:100%;padding:5px 8px;border:1px solid #d1d5db;border-radius:4px;font-size:.82rem">
+                    <option value="metadata_only">metadata_only — record URL/size/mime only</option>
+                    <option value="full">full — download content into export</option>
+                  </select>
+                </div>
+                <div class="cfg-toggle">
+                  <input type="checkbox" id="asset_check_avail" onchange="_assetCheckAvail=this.checked">
+                  <label for="asset_check_avail" style="font-weight:400">HEAD-check each asset URL before including it</label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Destination -->
+            <div id="dest_section" class="space-y-4">
+              <h4 class="font-headline text-base font-bold">Destination</h4>
+              <div class="space-y-3">
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Target</label>
+                  <div class="relative">
+                    <select id="dest_target" onchange="_destTarget=this.value" data-testid="dest-target"
+                      class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm font-medium appearance-none cursor-pointer focus:ring-1 focus:ring-primary/20">
+                      <option value="">— select target —</option>
+                    </select>
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline-variant pointer-events-none text-lg">expand_more</span>
+                  </div>
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Dataset name</label>
+                  <input type="text" id="dest_dataset_name" data-testid="dest-dataset-name" placeholder="my-export-2024" oninput="_destDatasetName=this.value"
+                    class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/20 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="space-y-1.5">
+                    <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Access</label>
+                    <div class="relative">
+                      <select id="dest_access" onchange="_destAccess=this.value" data-testid="dest-access"
+                        class="w-full bg-surface-container-low border-none rounded-xl py-2.5 px-4 text-sm appearance-none cursor-pointer focus:ring-1 focus:ring-primary/20">
+                        <option value="organization">organization</option>
+                        <option value="private">private</option>
+                      </select>
+                      <span class="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline-variant pointer-events-none text-base">expand_more</span>
+                    </div>
+                  </div>
+                  <div class="space-y-1.5">
+                    <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Dataset type</label>
+                    <div class="relative">
+                      <select id="dest_dataset_type" onchange="_destDatasetType=this.value" data-testid="dest-dataset-type"
+                        class="w-full bg-surface-container-low border-none rounded-xl py-2.5 px-4 text-sm appearance-none cursor-pointer focus:ring-1 focus:ring-primary/20">
+                        <option value="DATASET">DATASET</option>
+                        <option value="EXPERIMENT">EXPERIMENT</option>
+                      </select>
+                      <span class="absolute right-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-outline-variant pointer-events-none text-base">expand_more</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Export action row -->
+          <div class="flex items-center justify-end gap-3 pt-6 mt-8 border-t border-outline-variant/10">
+            <button class="btn-secondary btn-sm flex items-center gap-1.5" onclick="downloadConfigYaml()" title="Download current configuration as YAML">
+              <span class="material-symbols-outlined text-[15px]">download</span> Config YAML
+            </button>
+            <label class="btn-secondary btn-sm cursor-pointer flex items-center gap-1.5" style="margin:0" title="Upload a saved configuration YAML">
+              <span class="material-symbols-outlined text-[15px]">upload</span> Config YAML
+              <input type="file" id="yamlFileInput" data-testid="yaml-file-input" accept=".yaml,.yml" style="display:none" onchange="_onYamlFileSelected(this)">
+            </label>
+            <button onclick="showExportModal(_sampMode)"
+              class="bg-gradient-to-r from-primary to-primary-container text-on-primary px-8 py-3 rounded-xl font-headline font-bold text-base shadow-lg hover:shadow-primary/20 hover:scale-[1.01] active:scale-95 transition-all flex items-center gap-2">
+              <span class="material-symbols-outlined text-xl">send</span> Export
+            </button>
+          </div>
+        </section>
+
+        <!-- Scheduling & Automation -->
+        <section class="bg-surface-container-lowest rounded-2xl p-8 border border-outline-variant/15 shadow-sm">
+          <div class="flex items-center gap-4 mb-8">
+            <div class="w-12 h-12 rounded-2xl bg-surface-container-low flex items-center justify-center text-primary border border-outline-variant/10 flex-shrink-0">
+              <span class="material-symbols-outlined text-3xl">schedule</span>
+            </div>
+            <div>
+              <h3 class="font-headline text-xl font-bold">Scheduling &amp; Automation</h3>
+              <p class="text-sm text-on-surface-variant">Automate data orchestration workflows.</p>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+
+            <!-- Schedule -->
+            <div class="space-y-4">
+              <h4 class="font-headline text-base font-bold">Schedule</h4>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Cron Expression</label>
+                  <input type="text" id="schedule_cron" placeholder="0 9 * * 1" oninput="_scheduleCron=this.value"
+                    class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/20 focus:outline-none">
+                  <div class="text-[10px] text-on-surface-variant/60 font-label px-1">minute hour day month weekday</div>
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Timezone</label>
+                  <input type="text" id="schedule_tz" placeholder="UTC" value="UTC" oninput="_scheduleTz=this.value"
+                    class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/20 focus:outline-none">
+                </div>
+              </div>
+              <div class="flex items-center justify-between bg-surface-container-low px-4 py-3 rounded-xl border border-outline-variant/10">
+                <label for="schedule_enabled" class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant cursor-pointer">Schedule Enabled</label>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" id="schedule_enabled" checked onchange="_scheduleEnabled=this.checked" class="sr-only peer">
+                  <div class="w-10 h-5 bg-outline-variant rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary"></div>
+                </label>
+              </div>
+            </div>
+
+            <!-- Webhook -->
+            <div class="space-y-4">
+              <h4 class="font-headline text-base font-bold">Webhook
+                <span class="text-sm font-body font-normal text-on-surface-variant ml-1">— notified on job completion</span>
+              </h4>
+              <div class="space-y-3">
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">URL</label>
+                  <div class="relative flex items-center">
+                    <span class="absolute left-4 material-symbols-outlined text-outline-variant text-lg pointer-events-none">link</span>
+                    <input type="text" id="webhook_url" placeholder="https://example.com/hooks/done" oninput="_webhookUrl=this.value"
+                      class="w-full bg-surface-container-low border-none rounded-xl py-3 pl-12 pr-4 text-sm font-mono focus:ring-1 focus:ring-primary/20 focus:outline-none">
+                  </div>
+                </div>
+                <div class="space-y-1.5">
+                  <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">
+                    Headers <span class="normal-case font-normal text-on-surface-variant/60">(key: value, one per line)</span>
+                  </label>
+                  <textarea id="webhook_headers" rows="2" oninput="_webhookHeadersRaw=this.value"
+                    placeholder="Authorization: Bearer token"
+                    class="w-full bg-surface-container-low border-none rounded-xl py-3 px-4 text-sm font-mono resize-vertical focus:ring-1 focus:ring-primary/20 focus:outline-none"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                  <div class="space-y-1.5">
+                    <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">
+                      Secret <span class="normal-case font-normal">(HMAC signing)</span>
+                    </label>
+                    <input type="text" id="webhook_secret" placeholder="optional" oninput="_webhookSecret=this.value"
+                      class="w-full bg-surface-container-low border-none rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/20 focus:outline-none">
+                  </div>
+                  <div class="space-y-1.5">
+                    <label class="text-[10px] font-label font-bold uppercase tracking-widest text-on-surface-variant">Timeout (s)</label>
+                    <input type="number" id="webhook_timeout" value="30" min="1" max="300" oninput="_webhookTimeout=parseInt(this.value)||30"
+                      class="w-full bg-surface-container-low border-none rounded-xl py-2.5 px-4 text-sm font-mono focus:ring-1 focus:ring-primary/20 focus:outline-none">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /exportCard -->
+
+    </div><!-- /page content -->
+
+    <!-- Footer -->
+    <footer class="flex justify-between items-center px-8 py-4 border-t border-outline-variant/10 mt-12 bg-surface-container-lowest">
+      <div class="flex gap-8">
+        <a href="#" class="font-label text-[10px] uppercase tracking-widest text-on-surface-variant/70 hover:text-primary transition-colors">API Reference</a>
+      </div>
+    </footer>
+
+  </main>
 </div>
 
 <div id="modal"></div>

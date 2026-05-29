@@ -1,27 +1,30 @@
   *, *::before, *::after { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; color: #333; }
-  h1 { margin: 0 0 16px; font-size: 1.4rem; }
+  /* body/h1 globals are overridden by Tailwind in the new layout */
   .card { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
-  label { display: block; font-size: .85rem; font-weight: 600; margin-bottom: 4px; }
-  input[type=text] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; font-size: .9rem; }
-  .row { display: flex; gap: 12px; flex-wrap: wrap; }
-  .row > div { flex: 1; min-width: 140px; }
-  button { padding: 8px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: .9rem; font-weight: 600; }
-  .btn-primary { background: #2563eb; color: #fff; }
+  /* label: only apply defaults where Tailwind isn't owning the element */
+  .samp-panel label, .mask-rules-section label, .asset-panel label, .cfg-field label,
+  .export-opt-label, .import-form label, .conn-form label, .samp-strict {
+    display: block; font-size: .85rem; font-weight: 600; margin-bottom: 4px;
+  }
+  /* button globals: only for legacy btn-* classes, not Tailwind-styled buttons */
+  .btn-primary, .btn-secondary, .btn-sm, .samp-panel button:not([class*="text-"]),
+  .filter-add-row button, .mask-add-row button, .samp-add-row button, .asset-panel button {
+    cursor: pointer; border-radius: 4px; font-size: .9rem; font-weight: 600;
+  }
+  .btn-primary { background: #2563eb; color: #fff; border: none; padding: 8px 16px; }
   .btn-primary:hover { background: #1d4ed8; }
-  .btn-secondary { background: #e5e7eb; color: #333; }
+  .btn-secondary { background: #e5e7eb; color: #333; border: none; padding: 8px 16px; }
   .btn-secondary:hover { background: #d1d5db; }
-  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
-  th { background: #f9fafb; font-weight: 600; }
-  td.truncate { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  #status { margin: 10px 0; font-size: .85rem; color: #666; }
-  #urls { margin-top: 12px; }
-  .actions { display: flex; gap: 8px; margin-top: 12px; }
-  .btn-sm { padding: 4px 10px; font-size: .8rem; }
+  .btn-sm { padding: 4px 10px !important; font-size: .8rem !important; }
+  /* table globals only inside the results section */
+  #results table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+  #results th, #results td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
+  #results th { background: #f9fafb; font-weight: 600; }
+  #results td.truncate { max-width: 250px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 
   /* Datasource tabs */
-  .ds-tabs { display: flex; gap: 0; margin-bottom: 16px; border-bottom: 2px solid #e5e7eb; }
+  .ds-tabs { display: flex; gap: 0; }
   .ds-tab { padding: 10px 20px; cursor: pointer; font-size: .9rem; font-weight: 500; color: #666;
             border: 1px solid transparent; border-bottom: none; border-radius: 6px 6px 0 0;
             margin-bottom: -2px; transition: all .15s; display: flex; align-items: center; gap: 8px; }
