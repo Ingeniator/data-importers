@@ -2674,4 +2674,3 @@ async function _applyConfigYaml(yamlText) {
 
 // Boot
 init();
-</script>
