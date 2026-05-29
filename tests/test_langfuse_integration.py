@@ -19,7 +19,7 @@ import aioboto3
 from botocore.config import Config as BotoConfig
 
 from dataimporter.config import Datasource
-from dataimporter.langfuse import ping_langfuse, search_logs_langfuse
+from dataimporter.backends.langfuse import ping_langfuse, search_logs_langfuse
 
 LANGFUSE_URL = os.environ.get("LANGFUSE_URL")
 LANGFUSE_PUBLIC_KEY = os.environ.get("LANGFUSE_PUBLIC_KEY")

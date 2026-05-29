@@ -11,7 +11,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from dataimporter.auth import AuthContext, get_auth
-from dataimporter.config import Datasource, Settings, get_settings
+from dataimporter.config import Datasource
+from dataimporter.routes.deps import get_s3_datasource
 from dataimporter.s3 import _s3_client_config, _s3_session
 
 logger = structlog.get_logger(__name__)
@@ -26,18 +27,6 @@ class GetMediaResponse(BaseModel):
     uploadedAt: datetime | None = None
     url: str
     urlExpiry: str
-
-
-def _resolve_s3_datasource(
-    datasource: str = Query(),
-    settings: Settings = Depends(get_settings),
-) -> Datasource:
-    ds = settings.get_datasource(datasource)
-    if ds is None:
-        raise HTTPException(status_code=404, detail=f"Datasource '{datasource}' not found")
-    if ds.type != "s3":
-        raise HTTPException(status_code=400, detail=f"Datasource '{datasource}' is not an S3 datasource")
-    return ds
 
 
 def _meta_key(public_key: str, media_id: str, ds: Datasource) -> str:
@@ -57,7 +46,7 @@ def _blob_key(public_key: str, media_id: str, ds: Datasource) -> str:
 @router.get("/api/public/media/{media_id}", response_model=GetMediaResponse)
 async def get_media(
     media_id: str,
-    ds: Datasource = Depends(_resolve_s3_datasource),
+    ds: Datasource = Depends(get_s3_datasource),
     auth: AuthContext = Depends(get_auth),
 ) -> GetMediaResponse:
     meta = _meta_key(auth.public_key, media_id, ds)

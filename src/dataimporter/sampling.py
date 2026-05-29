@@ -1,9 +1,7 @@
 """Sampling engine — filter traces by strategy before import."""
 from __future__ import annotations
 
-import glob as _glob
 import math
-import os
 import random as _random
 import threading
 from typing import Any
@@ -193,47 +191,12 @@ def apply_sampling(
 
 # ── S3 / DuckDB integration ──────────────────────────────────────────────────
 
-try:
-    import duckdb
-    import duckdb_extension_httpfs
-    _HTTPFS_EXT = _glob.glob(
-        str(duckdb_extension_httpfs.__path__[0]) + "/**/httpfs.duckdb_extension",
-        recursive=True,
-    )[0]
-    _DUCKDB_AVAILABLE = True
-except Exception:
-    _DUCKDB_AVAILABLE = False
+from dataimporter.duckdb import _DUCKDB_AVAILABLE, apply_s3_settings, make_connection
 
 # Size-1 connection pool — one shared DuckDB connection, serialised by a lock.
 # S3 credentials are re-applied before every query so swapping datasources works.
 _duckdb_lock = threading.Lock()
 _duckdb_conn: Any = None  # guarded by _duckdb_lock
-
-
-def _make_duckdb_conn(ds: Any) -> Any:
-    """Create and fully initialise a DuckDB connection with httpfs loaded."""
-    os.makedirs(ds.duckdb_temp_dir, exist_ok=True)
-    os.environ.setdefault("HOME", ds.duckdb_temp_dir)
-    conn = duckdb.connect(":memory:", config={
-        "temp_directory": ds.duckdb_temp_dir,
-        "home_directory": ds.duckdb_temp_dir,
-    })
-    conn.install_extension(_HTTPFS_EXT, force_install=True)
-    conn.load_extension("httpfs")
-    return conn
-
-
-def _apply_s3_settings(conn: Any, ds: Any) -> None:
-    """(Re-)apply S3 credentials and endpoint on an existing connection."""
-    endpoint = (ds.endpoint or "").replace("https://", "").replace("http://", "")
-    use_ssl = (ds.endpoint or "").startswith("https://")
-    url_style = "vhost" if ds.addressing_style == "virtual" else "path"
-    conn.execute(f"SET s3_endpoint = '{endpoint}';")
-    conn.execute(f"SET s3_access_key_id = '{ds.access_key_id}';")
-    conn.execute(f"SET s3_secret_access_key = '{ds.secret_access_key}';")
-    conn.execute(f"SET s3_region = '{ds.region}';")
-    conn.execute(f"SET s3_use_ssl = {'true' if use_ssl else 'false'};")
-    conn.execute(f"SET s3_url_style = '{url_style}';")
 
 
 def read_s3_traces_for_sampling(keys: list[str], ds: Any) -> list[dict]:
@@ -248,8 +211,8 @@ def read_s3_traces_for_sampling(keys: list[str], ds: Any) -> list[dict]:
     with _duckdb_lock:
         global _duckdb_conn
         if _duckdb_conn is None:
-            _duckdb_conn = _make_duckdb_conn(ds)
-        _apply_s3_settings(_duckdb_conn, ds)
+            _duckdb_conn = make_connection(ds)
+        apply_s3_settings(_duckdb_conn, ds)
         try:
             sql = f"""
                 SELECT * EXCLUDE (rn)
@@ -282,7 +245,7 @@ def read_s3_traces_for_sampling(keys: list[str], ds: Any) -> list[dict]:
                 _duckdb_conn.close()
             except Exception:
                 pass
-            _duckdb_conn = None
+            _duckdb_conn = None  # reset so make_connection() rebuilds it next call
             return [{"_key": k} for k in keys]
 
 

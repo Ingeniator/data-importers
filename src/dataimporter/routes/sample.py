@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from dataimporter.adapters import get_adapter
 from dataimporter.auth import AuthContext, get_auth
-from dataimporter.config import Datasource, Settings, get_settings
+from dataimporter.config import Datasource
+from dataimporter.routes.deps import get_datasource
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
@@ -75,16 +76,6 @@ def _flatten_fields(records: list[dict]) -> dict[str, dict]:
     return fields
 
 
-def _resolve_datasource(
-    datasource: str = Query(),
-    settings: Settings = Depends(get_settings),
-) -> Datasource:
-    ds = settings.get_datasource(datasource)
-    if ds is None:
-        raise HTTPException(status_code=404, detail=f"Datasource '{datasource}' not found")
-    return ds
-
-
 @router.get("/api/public/datasource/sample")
 async def datasource_sample(
     start: datetime | None = Query(default=None),
@@ -94,7 +85,7 @@ async def datasource_sample(
     trace_type: str | None = Query(default=None),
     input_hash: str | None = Query(default=None),
     keys: list[str] = Query(default=[]),
-    ds: Datasource = Depends(_resolve_datasource),
+    ds: Datasource = Depends(get_datasource),
     auth: AuthContext = Depends(get_auth),
 ) -> dict:
     if start and start.tzinfo is None:

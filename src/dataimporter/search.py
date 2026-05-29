@@ -5,20 +5,9 @@ from __future__ import annotations
 import structlog
 
 from dataimporter.config import Datasource
+from dataimporter.duckdb import apply_s3_settings, make_connection
 
 logger = structlog.get_logger(__name__)
-
-_httpfs_installed = False
-_HTTPFS_EXT: str | None = None
-
-
-def _get_httpfs_ext() -> str:
-    global _HTTPFS_EXT
-    if _HTTPFS_EXT is None:
-        import glob as _glob
-        import duckdb_extension_httpfs
-        _HTTPFS_EXT = _glob.glob(str(duckdb_extension_httpfs.__path__[0]) + "/**/httpfs.duckdb_extension", recursive=True)[0]
-    return _HTTPFS_EXT
 
 
 def search_logs(
@@ -31,35 +20,10 @@ def search_logs(
     if not keys:
         return []
 
-    import duckdb
-
-    endpoint = ds.endpoint or ""
-    use_ssl = endpoint.startswith("https://")
-    endpoint_host = endpoint.replace("https://", "").replace("http://", "")
-
     urls = [f"s3://{ds.bucket}/{k}" for k in keys]
-
-    import os
-    global _httpfs_installed
-    os.makedirs(ds.duckdb_temp_dir, exist_ok=True)
-    os.environ.setdefault("HOME", ds.duckdb_temp_dir)
-    conn = duckdb.connect(":memory:", config={
-        "temp_directory": ds.duckdb_temp_dir,
-        "home_directory": ds.duckdb_temp_dir,
-    })
+    conn = make_connection(ds)
     try:
-        if not _httpfs_installed:
-            conn.install_extension(_get_httpfs_ext(), force_install=True)
-            _httpfs_installed = True
-        conn.load_extension("httpfs")
-        conn.execute(f"SET s3_endpoint = '{endpoint_host}';")
-        conn.execute(f"SET s3_access_key_id = '{ds.access_key_id}';")
-        conn.execute(f"SET s3_secret_access_key = '{ds.secret_access_key}';")
-        conn.execute(f"SET s3_region = '{ds.region}';")
-        conn.execute(f"SET s3_use_ssl = {'true' if use_ssl else 'false'};")
-        duckdb_url_style = "vhost" if ds.addressing_style == "virtual" else "path"
-        conn.execute(f"SET s3_url_style = '{duckdb_url_style}';")
-
+        apply_s3_settings(conn, ds)
         files_list = ", ".join(f"'{u}'" for u in urls)
 
         if query and query != "*":

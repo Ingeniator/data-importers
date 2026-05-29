@@ -9,22 +9,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from dataimporter.adapters import get_adapter
 from dataimporter.auth import AuthContext, get_auth
-from dataimporter.config import Datasource, Settings, get_settings
+from dataimporter.config import Datasource
 from dataimporter.filters import apply_filters, parse_filters
+from dataimporter.routes.deps import get_datasource
 
 logger = structlog.get_logger(__name__)
 
 router = APIRouter()
-
-
-def _resolve_datasource(
-    datasource: str = Query(),
-    settings: Settings = Depends(get_settings),
-) -> Datasource:
-    ds = settings.get_datasource(datasource)
-    if ds is None:
-        raise HTTPException(status_code=404, detail=f"Datasource '{datasource}' not found")
-    return ds
 
 
 @router.get("/api/public/logs/search")
@@ -39,7 +30,7 @@ async def search(
     limit: int = Query(default=50, le=500),
     filters: str | None = Query(default=None),
     time_field: str | None = Query(default=None),
-    ds: Datasource = Depends(_resolve_datasource),
+    ds: Datasource = Depends(get_datasource),
     auth: AuthContext = Depends(get_auth),
 ) -> dict:
     if start and start.tzinfo is None:

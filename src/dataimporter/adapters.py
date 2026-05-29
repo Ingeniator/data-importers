@@ -50,7 +50,7 @@ class ClickhouseAdapter:
         trace_type: str | None = None, input_hash: str | None = None,
         limit: int = 50, time_field: str | None = None,
     ) -> list[dict]:
-        from dataimporter.clickhouse import search_logs_ch
+        from dataimporter.backends.clickhouse import search_logs_ch
         return await search_logs_ch(
             query=query, project_id=auth.public_key, is_org_admin=auth.is_org_admin,
             ds=self.ds, start=start, end=end, session_id=session_id,
@@ -76,7 +76,7 @@ class ChytAdapter:
         trace_type: str | None = None, input_hash: str | None = None,
         limit: int = 50, time_field: str | None = None,
     ) -> list[dict]:
-        from dataimporter.chyt import search_logs_chyt
+        from dataimporter.backends.chyt import search_logs_chyt
         return await search_logs_chyt(
             query=query, project_id=auth.public_key, is_org_admin=auth.is_org_admin,
             ds=self.ds, start=start, end=end, session_id=session_id,
@@ -102,7 +102,7 @@ class TrinoAdapter:
         trace_type: str | None = None, input_hash: str | None = None,
         limit: int = 50, time_field: str | None = None,
     ) -> list[dict]:
-        from dataimporter.trino import search_logs_trino
+        from dataimporter.backends.trino import search_logs_trino
         return await search_logs_trino(
             query=query, project_id=auth.public_key, is_org_admin=auth.is_org_admin,
             ds=self.ds, start=start, end=end, session_id=session_id,
@@ -128,7 +128,7 @@ class LangfuseAdapter:
         trace_type: str | None = None, input_hash: str | None = None,
         limit: int = 50, time_field: str | None = None,
     ) -> list[dict]:
-        from dataimporter.langfuse import search_logs_langfuse
+        from dataimporter.backends.langfuse import search_logs_langfuse
         return await search_logs_langfuse(
             query=query, ds=self.ds, start=start, end=end,
             session_id=session_id, trace_id=trace_id,
@@ -136,7 +136,7 @@ class LangfuseAdapter:
         )
 
     async def ping(self) -> None:
-        from dataimporter.langfuse import ping_langfuse
+        from dataimporter.backends.langfuse import ping_langfuse
         await ping_langfuse(self.ds)
 
 

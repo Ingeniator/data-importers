@@ -12,6 +12,7 @@ from dataimporter.auth import AuthContext, get_auth
 from dataimporter.config import Settings, get_settings
 from dataimporter.importer import run_import_dataset, run_import_dataset_events
 from dataimporter.queue import PROGRESS_KEY, get_pool, is_queue_available
+from dataimporter.routes.deps import resolve_datasource, resolve_s3_datasource
 
 import structlog
 
@@ -59,15 +60,6 @@ def _resolve_target(name: str, settings: Settings):
     return t
 
 
-def _resolve_s3_datasource(name: str, settings: Settings):
-    ds = settings.get_datasource(name)
-    if ds is None:
-        raise HTTPException(status_code=404, detail=f"Datasource '{name}' not found")
-    if ds.type != "s3":
-        raise HTTPException(status_code=400, detail=f"Datasource '{name}' is not an S3 datasource")
-    return ds
-
-
 @router.post("/api/public/export/dataset")
 async def enqueue_export(
     req: ExportRequest,
@@ -80,7 +72,7 @@ async def enqueue_export(
         raise HTTPException(status_code=400, detail="No keys provided")
 
     target = _resolve_target(req.target, settings)
-    ds = _resolve_s3_datasource(req.datasource, settings)
+    ds = resolve_s3_datasource(req.datasource, settings)
 
     if is_queue_available():
         pool = await get_pool()
@@ -143,8 +135,7 @@ async def enqueue_events_export(
 
     target = _resolve_target(req.target, settings)
 
-    if settings.get_datasource(req.datasource) is None:
-        raise HTTPException(status_code=404, detail=f"Datasource '{req.datasource}' not found")
+    resolve_datasource(req.datasource, settings)  # raises 404 if not found
 
     if is_queue_available():
         pool = await get_pool()
