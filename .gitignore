@@ -60,3 +60,13 @@ src/dataimporter/routes/__pycache__/search.cpython-313.pyc
 .specify/workflows/workflow-registry.json
 .specify/workflows/speckit/workflow.yml
 CLAUDE.md
+.specify/feature.json
+src/dataimporter/__pycache__/clickhouse.cpython-313.pyc
+src/dataimporter/__pycache__/config.cpython-313.pyc
+src/dataimporter/__pycache__/main.cpython-313.pyc
+src/dataimporter/__pycache__/s3.cpython-313.pyc
+src/dataimporter/__pycache__/search.cpython-313.pyc
+src/dataimporter/__pycache__/trino.cpython-313.pyc
+src/dataimporter/routes/__pycache__/logs.cpython-313.pyc
+src/dataimporter/routes/__pycache__/media.cpython-313.pyc
+src/dataimporter/routes/__pycache__/search.cpython-313.pyc

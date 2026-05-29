@@ -1,0 +1,205 @@
+openapi: 3.1.0
+info:
+  title: dataimporter — datasource adapter redesign (changed surfaces)
+  version: "0.1.0"
+  description: >
+    Only the endpoints affected by the adapter redesign are documented here.
+    Response envelopes are unchanged from current behavior; the two behavioral
+    changes are: (1) /api/public/datasource/sample drops the `keys[]` query
+    parameter, and (2) /api/public/proxy/search returns content-search results
+    for S3 connections instead of an object listing.
+
+paths:
+  /api/public/logs/search:
+    get:
+      summary: Full-text search over a datasource (unchanged contract)
+      security: [ { basicAuth: [] } ]
+      parameters:
+        - { name: datasource, in: query, required: true, schema: { type: string } }
+        - { name: q, in: query, required: true, schema: { type: string, minLength: 1 } }
+        - { name: start, in: query, schema: { type: string, format: date-time } }
+        - { name: end, in: query, schema: { type: string, format: date-time } }
+        - { name: session_id, in: query, schema: { type: string } }
+        - { name: trace_id, in: query, schema: { type: string } }
+        - { name: trace_type, in: query, schema: { type: string } }
+        - { name: input_hash, in: query, schema: { type: string } }
+        - { name: time_field, in: query, schema: { type: string }, description: "Timestamp column; backends with a single time dimension reject non-default values with 400." }
+        - { name: filters, in: query, schema: { type: string }, description: "JSON array of FilterRule." }
+        - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 500 } }
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+              examples:
+                ok:
+                  value:
+                    results:
+                      - { id: "evt-1", type: "generation", timestamp: "2026-05-01T12:00:00Z", body: { input: "hi", cost: 0.012 } }
+                    backend: "clickhouse"
+        "400":
+          description: Unknown/unsupported datasource type, or unsupported time_field
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                unsupported_type:
+                  value: { detail: "Search not supported for datasource type 'other'" }
+        "404":
+          description: Datasource not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing:
+                  value: { detail: "Datasource 'nope' not found" }
+
+  /api/public/datasource/sample:
+    get:
+      summary: Schema discovery — field map from a representative sample
+      description: >
+        CHANGED: the `keys[]` query parameter is removed. S3 now derives its
+        key set from the same filters as search. The sample is drawn
+        time-bucketed across [start, end].
+      security: [ { basicAuth: [] } ]
+      parameters:
+        - { name: datasource, in: query, required: true, schema: { type: string } }
+        - { name: start, in: query, schema: { type: string, format: date-time } }
+        - { name: end, in: query, schema: { type: string, format: date-time } }
+        - { name: session_id, in: query, schema: { type: string } }
+        - { name: trace_id, in: query, schema: { type: string } }
+        - { name: trace_type, in: query, schema: { type: string } }
+        - { name: input_hash, in: query, schema: { type: string } }
+        - { name: time_field, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Discovered field map
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SampleResponse" }
+              examples:
+                ok:
+                  value:
+                    fields:
+                      "body.cost": { type: "float", example: 0.012 }
+                      "body.input": { type: "string", example: "hello" }
+                      "session_id": { type: "string", example: "sess-1" }
+                    sample_count: 5
+                empty:
+                  value: { fields: {}, sample_count: 0 }
+        "400":
+          description: Unsupported datasource type, or unsupported time_field
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                unsupported:
+                  value: { detail: "Schema discovery not supported for 'other'" }
+        "404":
+          description: Datasource not found
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                missing:
+                  value: { detail: "Datasource 'nope' not found" }
+
+  /api/public/proxy/search:
+    post:
+      summary: Search via user-supplied credentials against an allowlisted host
+      description: >
+        CHANGED: for S3 connections this now performs DuckDB content search
+        (same path as the authenticated route) instead of listing objects.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProxySearchRequest" }
+            examples:
+              s3:
+                value:
+                  credentials: { connection_url: "https://s3.example.com", access_key_id: "AK", secret_access_key: "SK", bucket: "logs" }
+                  q: "error"
+                  limit: 50
+      responses:
+        "200":
+          description: Search results (content search for all backends incl. S3)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SearchResponse" }
+              examples:
+                ok:
+                  value:
+                    results: [ { id: "evt-9", type: "trace", timestamp: "2026-05-01T00:00:00Z", body: { input: "error here" } } ]
+                    backend: "s3"
+        "400":
+          description: Bad request (e.g. S3 connection missing bucket, unsupported type)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                no_bucket:
+                  value: { detail: "S3 connection requires a bucket name" }
+        "403":
+          description: Connection URL not in allowlist
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+              examples:
+                blocked:
+                  value: { detail: "Connection URL not in allowlist" }
+
+components:
+  securitySchemes:
+    basicAuth: { type: http, scheme: basic }
+  schemas:
+    SearchResponse:
+      type: object
+      required: [results, backend]
+      properties:
+        results:
+          type: array
+          items: { type: object, additionalProperties: true }
+        backend: { type: string, example: "clickhouse" }
+    SampleResponse:
+      type: object
+      required: [fields, sample_count]
+      properties:
+        fields:
+          type: object
+          additionalProperties:
+            type: object
+            required: [type, example]
+            properties:
+              type: { type: string, enum: [bool, int, float, list, object, string] }
+              example: {}
+        sample_count: { type: integer, example: 5 }
+    UserCredentials:
+      type: object
+      required: [connection_url]
+      properties:
+        connection_url: { type: string }
+        access_key_id: { type: string, default: "" }
+        secret_access_key: { type: string, default: "" }
+        bucket: { type: string, default: "" }
+        key_prefix: { type: string, default: "" }
+        region: { type: string, default: "" }
+    ProxySearchRequest:
+      type: object
+      required: [credentials, q]
+      properties:
+        credentials: { $ref: "#/components/schemas/UserCredentials" }
+        q: { type: string }
+        start: { type: string, format: date-time, nullable: true }
+        end: { type: string, format: date-time, nullable: true }
+        session_id: { type: string, nullable: true }
+        trace_id: { type: string, nullable: true }
+        trace_type: { type: string, nullable: true }
+        input_hash: { type: string, nullable: true }
+        limit: { type: integer, default: 50 }
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
