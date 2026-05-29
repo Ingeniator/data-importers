@@ -19,9 +19,11 @@ datasources:
 
   - name: "Trino"
     type: trino
+    # Federates over the existing ClickHouse instance via Trino's clickhouse connector
+    # (see trino/catalog/clickhouse.properties). Catalog/schema must match that file.
     url: "http://trino:8080"
-    catalog: "hive"
-    schema_name: "llm_logs"
+    catalog: "clickhouse"
+    schema_name: "default"
     table: "llogr_events"
     user: "dataimporter"
 
