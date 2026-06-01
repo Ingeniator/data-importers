@@ -69,6 +69,13 @@ targets:
     default_access: "organization"
     default_dataset_type: "DATASET"
 
+  # Annotator mock — no auth. Omitting token_url disables the OAuth2 exchange,
+  # so requests go out without an Authorization header (the mock ignores it).
+  - name: "Annotator Mock"
+    base_url: "http://annotator-mock:8010"
+    default_access: "organization"
+    default_dataset_type: "DATASET"
+
 server:
   root_path: "/dataimporter"
   hide_auth_inputs: true

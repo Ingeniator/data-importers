@@ -18,8 +18,20 @@ _token_cache: dict[str, tuple[str, float]] = {}
 _token_locks: dict[str, asyncio.Lock] = {}
 
 
+def _auth_headers(token: str) -> dict[str, str]:
+    """Authorization header for a token, or no header for auth-less targets."""
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
 async def get_token(target: DatasetTarget) -> str:
-    """Return a valid Bearer token, refreshing via client_credentials if needed."""
+    """Return a valid Bearer token, refreshing via client_credentials if needed.
+
+    Returns "" when the target has no token_url configured, in which case
+    requests are sent without an Authorization header (auth-less mock targets).
+    """
+    if not target.token_url:
+        return ""
+
     lock = _token_locks.setdefault(target.name, asyncio.Lock())
     async with lock:
         now = time.monotonic()
@@ -58,7 +70,7 @@ async def create_dataset(
         resp = await client.post(
             f"{target.base_url.rstrip('/')}/api/v0/datasets",
             json={"name": name, "access": access, "dataset_type": dataset_type},
-            headers={"Authorization": f"Bearer {token}"},
+            headers=_auth_headers(token),
         )
         resp.raise_for_status()
         return resp.json()["id"]
@@ -77,7 +89,7 @@ async def upload_file(
         resp = await client.post(
             f"{target.base_url.rstrip('/')}/api/v0/datasets/{dataset_id}/files",
             files={"file": (filename, content, "application/octet-stream")},
-            headers={"Authorization": f"Bearer {token}"},
+            headers=_auth_headers(token),
         )
         resp.raise_for_status()
         return resp.json()

@@ -125,9 +125,11 @@ class DatasetTarget:
     """A remote dataset service to import files into."""
     name: str
     base_url: str
-    token_url: str
-    client_id: str
-    client_secret: str
+    # OAuth2 client_credentials. Leave token_url empty to disable auth entirely
+    # (e.g. for a mock dataset service that ignores Authorization headers).
+    token_url: str = ""
+    client_id: str = ""
+    client_secret: str = ""
     default_access: str = "organization"
     default_dataset_type: str = "DATASET"
     # seconds; 300 comfortably covers 100 MB at ~3 MB/s
