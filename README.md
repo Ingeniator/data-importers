@@ -1,5 +1,7 @@
 # dataimporter
 
+> **Deprecated.** This service is superseded by [databridge](../databridge). No new features will be added.
+
 Browse and search LLM logs stored in external backends. Import selected data into a dataset service.
 
 Read-only companion to [llogr](../llogr) (which handles data ingestion).
@@ -160,22 +162,7 @@ Files are streamed from S3 into memory one at a time and uploaded to the dataset
 
 ## Mock dataset service
 
-A local mock of the dataset service is included for testing the import UX:
-
-```bash
-uv run python tests/mock_dataset_service.py --port 9100
-```
-
-The mock prints a `config.yaml` snippet on startup. It stores uploaded files in `/tmp/mock-dataset-service` (override with `--upload-dir`).
-
-Inspect what was imported:
-```
-GET http://localhost:9100/_mock/datasets          — list datasets
-GET http://localhost:9100/_mock/datasets/{id}     — dataset detail and file list
-GET http://localhost:9100/_mock/files/{id}        — download an uploaded file
-```
-
-In the Docker Compose stack, the mock runs as the `dataset-mock` service and is pre-wired as a target in `config.gateway.yaml`.
+The mock dataset service has moved to [dataset-mock](../dataset-mock) at the ai-suite root.
 
 ## Endpoints
 
